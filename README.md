@@ -88,45 +88,55 @@ View in Browser: A new tab should automatically open in your web browser with th
 
 
 # How to Use the App
-Load Data: Use either "Option A: Upload Files" to select .mat files from your computer or, if running locally, use "Option B: Load from Folder" to load all files from a specific directory path.
+## Load Data
+Use either "Option A: Upload Files" to select .mat files from your computer or, if running locally, use "Option B: Load from Folder" to load all files from a specific directory path.
 
-Configure Files: For each loaded file, an expander will appear.
+#### 1. Configure Files
+For each loaded file, an expander will appear.
 
-Select Channels: Use the multiselect box to choose which channels you want to analyze.
+#### 2. Select Channels
+Use the multiselect box to choose which channels you want to analyze.
 
-Define Time Ranges: For each selected channel, a text box will appear. Enter the start and end times (in seconds) for the analysis intervals (e.g., 10 20; 30 45).
+#### 3. Define Time Ranges
+For each selected channel, a text box will appear. Enter the start and end times (in seconds) for the analysis intervals (e.g., 10 20; 30 45).
 
-Set Analysis Parameters: Use the global settings sections to configure the parameters for PSD, PAC, Coherence, and Comodulogram calculations.
+## Set Analysis Parameters
+Use the global settings sections to configure the parameters for PSD, PAC, Coherence, and Comodulogram calculations.
 
-Run Analysis: Click the "Start Calculation" button for the desired analysis. The app will process the data according to your configuration.
+#### Run Analysis
+Click the "Start Calculation" button for the desired analysis. The app will process the data according to your configuration.
 
-View and Export:
+## View and Export
 
-Plots: After the calculation is complete, a multiselect box will appear, allowing you to choose which of the generated plots to display.
+#### Plots
+After the calculation is complete, a multiselect box will appear, allowing you to choose which of the generated plots to display.
 
-Results: The numerical results are stored and can be viewed in an expander.
+#### Results
+The numerical results are stored and can be viewed in an expander.
 
-Export: Click the "Download Results as Excel" button to save all numerical data to a structured .xlsx file.
+#### Export
+Click the "Download Results as Excel" button to save all numerical data to a structured .xlsx file.
 
-📂 File Structure
-app.py: The main script that runs the Streamlit application and organizes the UI.
 
-requirements.txt: A list of all Python libraries required to run the project.
+# File Structure
+**app.py:** The main script that runs the Streamlit application and organizes the UI.
 
-src/: A folder containing the core logic for the application.
+**requirements.txt:** A list of all Python libraries required to run the project.
 
-PSD.py: Functions for PSD and spectrogram analysis.
+**src/:** A folder containing the core logic for the application.
 
-PAC.py: Functions for Phase-Amplitude Coupling analysis.
+**PSD.py:** Functions for PSD and spectrogram analysis.
 
-Coherence.py: Functions for coherence and coheregram analysis.
+**PAC.py:** Functions for Phase-Amplitude Coupling analysis.
 
-Comodulogram.py: Functions for comodulogram analysis.
+**Coherence.py:** Functions for coherence and coheregram analysis.
 
-analysis_utils.py: Functions for calculating summary statistics (means, SEMs).
+**Comodulogram.py:** Functions for comodulogram analysis.
 
-export_utils.py: Functions for exporting results to Excel.
+**analysis_utils.py:** Functions for calculating summary statistics (means, SEMs).
 
-file_loader.py: UI and logic for file handling and channel configuration.
+**export_utils.py:** Functions for exporting results to Excel.
 
-utils.py: General helper functions used across the application.
+**file_loader.py:** UI and logic for file handling and channel configuration.
+
+**utils.py:** General helper functions used across the application.
