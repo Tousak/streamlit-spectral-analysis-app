@@ -1,43 +1,40 @@
-Electrophysiology Signal Analysis Suite
+# Description
+
+## Electrophysiology Signal Analysis Suite
 This is a comprehensive Streamlit web application designed for the analysis of electrophysiological data (such as EEG or LFP signals) stored in .mat files. It provides a user-friendly interface to perform a variety of advanced signal processing tasks, visualize the results, and export the data for further analysis.
 
 The application is a Python-based replication and extension of a MATLAB analysis pipeline, offering interactive plots and flexible parameter configuration.
 
-✨ Features
+## Features
 This application supports a wide range of standard electrophysiological analyses:
 
-Power Spectral Density (PSD): Calculates and plots the power spectrum of a signal, including summary statistics (mean and SEM) for standard frequency bands (Delta, Theta, Alpha, Beta, Gamma).
-
-Spectrogram: Generates time-frequency plots to visualize how the spectral content of a signal changes over time for specific intervals.
-
-Phase-Amplitude Coupling (PAC):
-
-Calculates PAC metrics (Modulation Index, Mean Vector Length, Phase-Locking Value) for user-defined phase and amplitude frequency bands.
-
-Supports both within-channel and between-channel (cross-channel) PAC analysis.
-
-Includes an optional sliding-window analysis to view PAC changes over time.
-
-Comodulogram: Creates a heatmap (or smooth contour plot) of Modulation Index values across a grid of phase and amplitude frequencies to identify coupling relationships.
-
-Coherence:
-
-Calculates the magnitude-squared coherence between two paired channels to measure their linear correlation at different frequencies.
-
-Provides summary statistics for coherence within standard frequency bands.
-
-Coheregram: Generates a time-frequency heatmap of coherence, showing how the correlation between two signals evolves over time.
-
-Interactive Data Handling:
-
+### Interactive Data Handling:
 Upload .mat files directly through the browser.
-
 For local use, load all files from a specified folder path, bypassing browser upload limits.
-
 Dynamically select channels and define multiple time ranges for analysis.
 
-Data Export:
+### Power Spectral Density (PSD)
+Calculates and plots the power spectrum of a signal, including summary statistics (mean and SEM) for standard frequency bands (Delta, Theta, Alpha, Beta, Gamma).
 
+### Spectrogram
+Generates time-frequency plots to visualize how the spectral content of a signal changes over time for specific intervals.
+
+### Phase-Amplitude Coupling (PAC)
+Calculates PAC metrics (Modulation Index, Mean Vector Length, Phase-Locking Value) for user-defined phase and amplitude frequency bands.
+Supports both within-channel and between-channel (cross-channel) PAC analysis.
+Includes an optional sliding-window analysis to view PAC changes over time.
+
+### Comodulogram
+Creates a heatmap (or smooth contour plot) of Modulation Index values across a grid of phase and amplitude frequencies to identify coupling relationships.
+
+### Coherence
+Calculates the magnitude-squared coherence between two paired channels to measure their linear correlation at different frequencies.
+Provides summary statistics for coherence within standard frequency bands.
+
+### Coheregram
+Generates a time-frequency heatmap of coherence, showing how the correlation between two signals evolves over time.
+
+### Data Export
 Export all numerical results (including summary statistics) to a multi-sheet Excel file.
 
 The Excel export can be configured to create detailed "dashboards" with plots embedded alongside the data tables.
