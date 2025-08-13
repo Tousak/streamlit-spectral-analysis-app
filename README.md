@@ -42,10 +42,11 @@ Export all numerical results (including summary statistics) to a multi-sheet Exc
 
 The Excel export can be configured to create detailed "dashboards" with plots embedded alongside the data tables.
 
+# Installation
 🚀 Getting Started
 Follow these instructions to set up and run the application on a local computer. This guide assumes you have Git and Python installed.
 
-1. Clone the Repository
+1. ## Clone the Repository
 First, you need to get the project files from the Git repository.
 
 Create a Folder: Create a new, empty folder on your computer where you want to store the project (e.g., C:\Projects\AnalysisApp).
@@ -58,7 +59,7 @@ git clone <your-git-repository-ssh-link> .
 
 (Note: The . at the end clones the files directly into your current folder.)
 
-2. Set Up the Python Environment
+2. ## Set Up the Python Environment
 It is highly recommended to use a virtual environment to keep the project's dependencies isolated.
 
 Create the Environment: In the same terminal, run this command to create a virtual environment folder named .venv.
@@ -67,19 +68,19 @@ python -m venv .venv
 
 Activate the Environment: To start using the environment, run the following command. You will need to do this every time you open a new terminal to work on the project.
 
-# For Windows PowerShell
+For Windows PowerShell
 .\.venv\Scripts\Activate.ps1
 
 You should see (.venv) appear at the beginning of your terminal prompt.
 
-3. Install Dependencies
+3. ## Install Dependencies
 Install all the required Python libraries using the requirements.txt file.
 
 Install Libraries: With your virtual environment active, run this single command:
 
 pip install -r requirements.txt
 
-4. Run the Application
+4. ## Run the Application
 You are now ready to start the app.
 
 Launch Streamlit: In the terminal (with the environment still active), run:
@@ -88,7 +89,8 @@ streamlit run app.py
 
 View in Browser: A new tab should automatically open in your web browser with the application running, typically at http://localhost:8501.
 
-📖 How to Use the App
+
+# How to Use the App
 Load Data: Use either "Option A: Upload Files" to select .mat files from your computer or, if running locally, use "Option B: Load from Folder" to load all files from a specific directory path.
 
 Configure Files: For each loaded file, an expander will appear.
