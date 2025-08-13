@@ -46,7 +46,7 @@ The Excel export can be configured to create detailed "dashboards" with plots em
 🚀 Getting Started
 Follow these instructions to set up and run the application on a local computer. This guide assumes you have Git and Python installed.
 
-1. ## Clone the Repository
+## 1. Clone the Repository
 First, you need to get the project files from the Git repository.
 
 Create a Folder: Create a new, empty folder on your computer where you want to store the project (e.g., C:\Projects\AnalysisApp).
@@ -59,7 +59,7 @@ git clone <your-git-repository-ssh-link> .
 
 (Note: The . at the end clones the files directly into your current folder.)
 
-2. ## Set Up the Python Environment
+## 2. Set Up the Python Environment
 It is highly recommended to use a virtual environment to keep the project's dependencies isolated.
 
 Create the Environment: In the same terminal, run this command to create a virtual environment folder named .venv.
@@ -73,14 +73,14 @@ For Windows PowerShell
 
 You should see (.venv) appear at the beginning of your terminal prompt.
 
-3. ## Install Dependencies
+## 3. Install Dependencies
 Install all the required Python libraries using the requirements.txt file.
 
 Install Libraries: With your virtual environment active, run this single command:
 
 pip install -r requirements.txt
 
-4. ## Run the Application
+## 4. Run the Application
 You are now ready to start the app.
 
 Launch Streamlit: In the terminal (with the environment still active), run:
