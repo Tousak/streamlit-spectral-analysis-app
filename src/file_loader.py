@@ -166,7 +166,6 @@ def file_list_creator():
     st.session_state.file_list = []
     # Initialize a session state variable to hold the files
 
-
     col1, col2 = st.columns(2)
 
     # --- COLUMN 1: File Uploader ---
