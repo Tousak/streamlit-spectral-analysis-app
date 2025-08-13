@@ -1,0 +1,5 @@
+spodni hranice [Hz] pro coheregram
+download button pro figures
+comudologram na min-max barvy - zkusit to znormalizovat
+vazeny prumer z casu 
+kouknout na to jak spravne prumerovat koherence

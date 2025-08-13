@@ -1,0 +1,9 @@
+pandas
+streamlit
+scipy
+numpy
+h5py
+matplotlib
+plotly
+openpyxl
+altair
