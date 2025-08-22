@@ -7,8 +7,6 @@ __pycache__/
 env/
 venv/
 
-# Streamlit config
-.streamlit/
 
 # OS-specific files
 .DS_Store

@@ -1,0 +1,5 @@
+# .streamlit/config.toml
+
+[server]
+fileWatcherType = "poll"
+maxUploadSize = 4108
