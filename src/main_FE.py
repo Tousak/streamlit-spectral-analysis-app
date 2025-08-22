@@ -78,7 +78,7 @@ def PAC_settings(selections):
             st.markdown("**Amplitude Bands**")
             amp_bands_str = st.text_input(
                 "Enter Amp Bands (e.g., `30 55; 55 100`)",
-                value="55 80; 80 100", # Default value
+                value="30 55; 55 100", # Default value
                 key="pac_amp_bands",
                 on_change=utils.reset_values
             )
