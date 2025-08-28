@@ -1,110 +1,95 @@
 # src/Comodulogram.py
 
 import numpy as np
-import plotly.graph_objects as go
+import matplotlib.pyplot as plt # Import Matplotlib
 from scipy import signal
-# Import the notch filter from your existing PSD module
 from src import utils
+from pactools import Comodulogram # Import the Comodulogram class
+import streamlit as st # Import Streamlit
 
 # ==============================================================================
-# 1. HELPER FUNCTION (Equivalent to ModIndex_v2)
-# ==============================================================================
-
-def _calculate_mi(phase_series, amp_series, n_bins):
-    """Calculates the Modulation Index (MI) using the KL-divergence method."""
-    bin_edges = np.linspace(-np.pi, np.pi, n_bins + 1)
-    binned_phase = np.digitize(phase_series, bin_edges)
-    
-    mean_amp_by_bin = np.array([
-        np.mean(amp_series[binned_phase == i]) for i in range(1, n_bins + 1)
-    ])
-    mean_amp_by_bin = np.nan_to_num(mean_amp_by_bin, nan=1e-15) # Avoid NaNs
-    
-    p_norm = mean_amp_by_bin / np.sum(mean_amp_by_bin)
-    
-    # Calculate entropy and MI
-    H = -np.sum(p_norm * np.log(p_norm + 1e-15))
-    MI = (np.log(n_bins) - H) / np.log(n_bins)
-    return MI
-
-# ==============================================================================
-# 2. CORE CALCULATION ENGINE (Equivalent to cmd_try)
+# 2. CORE CALCULATION ENGINE (Rewritten with pactools)
 # ==============================================================================
 
 def _calculate_and_plot_comodulogram(data_slice, fs, chann_name, time_range_str, params):
     """
-    Core function with improved filter logic for near-zero frequencies.
+    Core function to calculate and plot a smooth comodulogram using pactools for 
+    calculation and Matplotlib's contourf for plotting.
     """
     chann_name = utils.remove_invalid_chars(chann_name)
     
-    # You can now set start to a small positive number, e.g., 0.1
-    phase_start = params['phase_vec_start']
-    amp_start = params['amp_vec_start']
-    
-    # Ensure start values are not exactly zero
-    if phase_start <= 0: phase_start = 0.1
-    if amp_start <= 0: amp_start = 0.1
-    
-    phase_vec = np.arange(phase_start, params['phase_vec_end'], params['phase_vec_dt'])
-    amp_vec = np.arange(amp_start, params['amp_vec_end'], params['amp_vec_dt'])
-    
-    phase_bw = params['phase_vec_dt'] / 2.0
-    amp_bw = params['amp_vec_dt'] / 4.0
-    
-    lfp = utils.notch_filter_50hz(data_slice, fs, params['F_h'])
-
-    # --- Filtering and Hilbert transform (MODIFIED LOGIC) ---
-    amp_envelopes = []
-    for i, amp_f in enumerate(amp_vec):
-        f_high = amp_f + amp_bw
-        # Use a lowpass filter for the first bin if it's near zero
-        if i == 0 and amp_f < 1.0:
-            b, a = signal.butter(4, f_high, btype='lowpass', fs=fs)
-        else:
-            b, a = signal.butter(4, [amp_f, f_high], btype='bandpass', fs=fs)
-        filtered_amp = signal.filtfilt(b, a, lfp)
-        amp_envelopes.append(np.abs(signal.hilbert(filtered_amp)))
-
-    phase_series_list = []
-    for i, phase_f in enumerate(phase_vec):
-        f_high = phase_f + phase_bw
-        # Use a lowpass filter for the first bin if it's near zero
-        if i == 0 and phase_f < 1.0:
-            b, a = signal.butter(4, f_high, btype='lowpass', fs=fs)
-        else:
-            b, a = signal.butter(4, [phase_f, f_high], btype='bandpass', fs=fs)
-        filtered_phase = signal.filtfilt(b, a, lfp)
-        phase_series_list.append(np.angle(signal.hilbert(filtered_phase)))
+    # --- Ensure start frequencies are always positive ---
+    phase_start = params.get('phase_vec_start', 0.1)
+    if phase_start <= 0:
+        phase_start = 0.1 
         
-    # --- Compute MI and comodulogram matrix ---
-    comodulogram = np.zeros((len(amp_vec), len(phase_vec)))
-    for i, phase_series in enumerate(phase_series_list):
-        for j, amp_envelope in enumerate(amp_envelopes):
-            MI = _calculate_mi(phase_series, amp_envelope, params['n_bins'])
-            comodulogram[j, i] = MI
-    
-    # --- Plot comodulogram using Plotly Contour (MODIFIED) ---
-    fig = go.Figure(data=go.Contour(
-        z=comodulogram,
-        x=phase_vec + phase_bw / 2,
-        y=amp_vec + amp_bw / 2,
-        colorscale='Jet',
-        contours_coloring='fill', # This creates the filled effect like contourf
-        line_smoothing=0.85,      # This makes the contours smooth
-        zmin=params['cax_cmd_vals'][0],
-        zmax=params['cax_cmd_vals'][1],
-        colorbar={'title': 'Modulation Index'}
-    ))
-    fig.update_layout(
-        title=f'Comodulogram: {chann_name} ({time_range_str})',
-        xaxis_title='Phase Frequency (Hz)',
-        yaxis_title='Amplitude Frequency (Hz)'
+    amp_start = params.get('amp_vec_start', 0.1)
+    if amp_start <= 0:
+        amp_start = 0.1
+    # --- END FIX ---
+
+    # --- 1. Define frequency ranges for the analysis ---
+    low_fq_range = np.arange(
+        phase_start, 
+        params['phase_vec_end'], 
+        params['phase_vec_dt']
+    )
+    high_fq_range = np.arange(
+        amp_start, 
+        params['amp_vec_end'], 
+        params['amp_vec_dt']
     )
     
+    # The notch filter is now applied in the orchestrator function before this is called
+    lfp = data_slice
+
+    # --- 2. Instantiate and run the Comodulogram estimator ---
+    estimator = Comodulogram(
+        fs=fs,
+        low_fq_range=low_fq_range,
+        high_fq_range=high_fq_range,
+        low_fq_width=params['phase_vec_dt'] * 2.0,
+        method='tort',
+        progress_bar=False
+    )
+    estimator.fit(lfp)
+    comodulogram = estimator.comod_
+    
+    # --- 3. COLOR SCALING using absolute min/max ---
+    if comodulogram.size > 0:
+        vmin = np.nanmin(comodulogram)
+        vmax = np.nanmax(comodulogram)
+        if np.isclose(vmin, vmax):
+            vmax = vmin + 1e-9 # Failsafe for flat data
+    else:
+        vmin, vmax = 0, 1
+    
+    # --- 4. PLOTTING (Using contourf for a smooth plot) ---
+    fig, ax = plt.subplots(figsize=(10, 8))
+    
+    levels = 40 # Number of contour levels for a smooth gradient
+    
+    contour = ax.contourf(
+        low_fq_range, 
+        high_fq_range, 
+        comodulogram, 
+        levels=levels, 
+        cmap='jet', 
+        vmin=vmin, 
+        vmax=vmax
+    )
+    
+    fig.colorbar(contour, ax=ax, label='Modulation Index')
+    ax.set_title(f'Comodulogram: {chann_name} ({time_range_str})')
+    ax.set_xlabel('Phase Frequency (Hz)')
+    ax.set_ylabel('Amplitude Frequency (Hz)')
+    
+    fig.tight_layout()
+
     return fig, comodulogram
 
 # ==============================================================================
-# 3. MAIN ORCHESTRATOR FUNCTION
+# 3. MAIN ORCHESTRATOR FUNCTION (Updated for efficiency)
 # ==============================================================================
 
 def run_comodulogram_analysis(selections, params, file_map, load_mat_file_func):
@@ -126,9 +111,8 @@ def run_comodulogram_analysis(selections, params, file_map, load_mat_file_func):
         for channel_name, time_ranges in channels.items():
             if channel_name == 'pac_config' or not time_ranges: continue
             
-            # Extract the full signal and time vector once
             channel_data = mat_contents[channel_name]
-            signal_values = channel_data['values'].flatten()
+
             available_fields = channel_data.dtype.names if hasattr(channel_data, 'dtype') else channel_data.keys()
 
             if 'times' in available_fields:
@@ -138,22 +122,22 @@ def run_comodulogram_analysis(selections, params, file_map, load_mat_file_func):
             else:
                 fs_to_use = params['fs']
             
-            # Loop to run analysis on each individual time range
+            signal_values = channel_data['values'].flatten()
+            # Apply notch filter once per channel for efficiency
+            signal_values = utils.notch_filter_50hz(signal_values, fs_to_use, params['F_h'])
+
             for time_range in time_ranges:
                 time_range_str = f"{time_range[0]}-{time_range[1]}s"
                 
-                # Extract the specific slice of the signal
                 id_st = int(time_range[0] * fs_to_use)
                 id_end = int(time_range[1] * fs_to_use)
                 signal_slice = signal_values[id_st:id_end]
                 
-                # Call the core function to get the plot and data
                 fig, comod_data = _calculate_and_plot_comodulogram(
                     signal_slice, fs_to_use, channel_name, time_range_str, params
                 )
                 
-                # Store results and figures
                 results.setdefault(file_name, {}).setdefault(channel_name, {})[time_range_str] = comod_data.tolist()
-                figures.setdefault(file_name, {}).setdefault(channel_name, {})[fig.layout.title.text] = fig
+                figures.setdefault(file_name, {}).setdefault(channel_name, {})[fig.get_axes()[0].get_title()] = fig
 
     return results, figures

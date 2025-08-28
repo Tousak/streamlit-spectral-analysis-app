@@ -184,13 +184,6 @@ def PAC_settings(selections):
                 amp_vec_dt = c2.number_input("Amplitude Freq Step [Hz]", min_value=1, value=2,on_change=utils.reset_values)
                 amp_vec_end = c3.number_input("Amplitude Freq End [Hz]", value=100,on_change=utils.reset_values)
                 
-                st.markdown("**Comodulogram Color Axis**")
-                cax_cmd_vals = st.slider(
-                    "Color axis range `[x, y]`", 
-                    min_value=0.0, max_value=0.01, value=(0.0, 0.0005), 
-                    step=0.00001, format="%.5f",
-                    on_change=utils.reset_values
-                )
             else:
                 phase_vec_start = False
                 phase_vec_dt  =False
@@ -227,7 +220,6 @@ def PAC_settings(selections):
         "amp_vec_start": amp_vec_start,
         "amp_vec_dt": amp_vec_dt,
         "amp_vec_end": amp_vec_end,
-        "cax_cmd_vals": cax_cmd_vals
     }
     
 

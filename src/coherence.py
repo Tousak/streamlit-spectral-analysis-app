@@ -3,7 +3,7 @@
 import numpy as np
 import plotly.graph_objects as go
 from scipy import signal
-
+from scipy.ndimage import uniform_filter1d # Import the filter
 # Import helper functions
 from src.utils import extract_short_name, notch_filter_50hz
 from src.PSD import calculate_band_power
@@ -18,36 +18,48 @@ def _calculate_and_plot_coherence(signal1_slice, signal2_slice, fs, plot_title, 
     fig.update_layout(title=plot_title, xaxis_title="Frequency (Hz)", yaxis_title="Coherence", yaxis_range=[0, 1], xaxis_range=[0, F_h])
     return fig, f, Cxy
 import streamlit as st
+
 def _calculate_and_plot_coheregram(signal1_slice, signal2_slice, fs, plot_title, F_h, time_res, freq_res):
     """
-    Calculates and plots a time-resolved coheregram (heatmap) with the correct formula.
+    Calculates and plots a time-resolved coheregram (heatmap) with spectral smoothing.
     """
-
     st.write(f'F_h: {F_h} || time_res: {time_res} || freq_res: {freq_res}')
-    # Use resolution parameters to define STFT window size
+    
+    # --- NEW: Detrend signals to remove DC offset before analysis ---
+    # This is the key step to prevent artificially high coherence at low frequencies.
+    signal1_slice = signal.detrend(signal1_slice, type='constant')
+    signal2_slice = signal.detrend(signal2_slice, type='constant')
+    # --- END NEW ---
+
     nperseg = int(fs / freq_res)
     noverlap = nperseg - int(fs * time_res)
     if noverlap >= nperseg:
-        noverlap = nperseg - 1 # Failsafe
+        noverlap = nperseg - 1
 
-    # --- 1. Get the time-resolved spectra using STFT ---
-    f, t, Sxx = signal.stft(signal1_slice, fs=fs, nperseg=nperseg, noverlap=noverlap)
-    _, _, Syy = signal.stft(signal2_slice, fs=fs, nperseg=nperseg, noverlap=noverlap)
+    # --- 1. Get the time-resolved spectra using STFT with a Hann window ---
+    f, t, Sxx = signal.stft(signal1_slice, fs=fs, nperseg=nperseg, noverlap=noverlap, window='hann')
+    _, _, Syy = signal.stft(signal2_slice, fs=fs, nperseg=nperseg, noverlap=noverlap, window='hann')
 
-    # --- 2. Calculate the time-resolved Cross-Spectral Density (CSD) ---
-    # Sxy is the product of Sxx and the complex conjugate of Syy
-    Sxy = Sxx * np.conj(Syy)
+    # --- 2. Calculate Power and Cross-Power Spectral Density ---
+    Pxx = np.abs(Sxx)**2
+    Pyy = np.abs(Syy)**2
+    Pxy = Sxx * np.conj(Syy)
 
-    # --- 3. Apply the Correct Coherence Formula (from the image you sent) ---
-    # Cxy = |Gxy|^2 / (Gxx * Gyy)
-    # where Gxx and Gyy are the power spectral densities (magnitude squared of STFT)
+    # --- 3. FIX: Smooth the spectral estimates over the time axis ---
+    # This averaging is essential for a meaningful coherence calculation.
+    # The window size determines how much smoothing is applied.
+    # A size of 3-5 is often a good starting point.
+    smoothing_window_size = 5 
     
-    # Add a small epsilon to avoid division by zero
-    epsilon = 1e-15
-    denominator = (np.abs(Sxx)**2) * (np.abs(Syy)**2)
-    coheregram = np.abs(Sxy)**2 / (denominator + epsilon)
-    # --- END CORRECTION ---
+    Pxx_smoothed = uniform_filter1d(Pxx, size=smoothing_window_size, axis=1)
+    Pyy_smoothed = uniform_filter1d(Pyy, size=smoothing_window_size, axis=1)
+    Pxy_smoothed = uniform_filter1d(Pxy, size=smoothing_window_size, axis=1)
+    # --- END FIX ---
 
+    # --- 4. Calculate Coherence using the smoothed estimates ---
+    epsilon = 1e-15
+    coheregram = (np.abs(Pxy_smoothed)**2) / (Pxx_smoothed * Pyy_smoothed + epsilon)
+    
     coheregram_real = coheregram.astype(np.float64)
 
     # Dynamic Color Range Logic
@@ -55,17 +67,17 @@ def _calculate_and_plot_coheregram(signal1_slice, signal2_slice, fs, plot_title,
     filtered_data = coheregram_real[freq_indices, :]
     z_min, z_max = (np.min(filtered_data), np.max(filtered_data)) if filtered_data.size > 0 else (0, 1)
     
-    # --- 4. Create the Smooth Contour Plot ---
+    # --- 5. Create the Smooth Contour Plot ---
     fig = go.Figure(data=go.Contour(
         z=coheregram_real,
         x=t + float(plot_title.split('(')[1].split('-')[0]),
         y=f,
         colorscale='Jet',
-        zmin=z_min,
-        zmax=z_max,
+        zmin=0,
+        zmax=1,
         colorbar={'title': 'Coherence'},
-        contours_coloring='fill', # This creates the filled effect like contourf
-        line_smoothing=0.85       # This makes the contours smooth
+        contours_coloring='fill',
+        line_smoothing=0.85
     ))
     fig.update_layout(
         title=plot_title,
@@ -75,6 +87,7 @@ def _calculate_and_plot_coheregram(signal1_slice, signal2_slice, fs, plot_title,
     fig.update_yaxes(range=[0, F_h])
     
     return fig, f, t, coheregram_real
+
 # --- NEW FUNCTION TO PLOT BAND COHERENCE ---
 def _create_band_coherence_barchart(band_means, band_errors, plot_title):
     """Creates a bar chart for the mean coherence in frequency bands."""

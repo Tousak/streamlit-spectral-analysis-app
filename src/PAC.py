@@ -90,6 +90,10 @@ def calculate_pac_metrics(phase_data, amp_data, fs, n_bins):
     """
     Calculates PAC metrics and returns both scalar values and the vectors needed for plotting.
     """
+    min_len = min(len(phase_data), len(amp_data))
+    phase_data = phase_data[:min_len]
+    amp_data = amp_data[:min_len]
+    
     phase_series = np.angle(signal.hilbert(phase_data))
     amplitude_series = np.abs(signal.hilbert(amp_data))
 

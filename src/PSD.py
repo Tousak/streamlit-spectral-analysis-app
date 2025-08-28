@@ -110,7 +110,7 @@ def psd_calc_python(data, norm_type, F_c, T1, F_h, spec_win_size, spec_noverlap,
 # ==============================================================================
 # 3. NEW MAIN ORCHESTRATOR FUNCTION
 # ==============================================================================
-
+import streamlit as st
 def run_psd_analysis(selections, params, file_map, load_mat_file_func):
     """
     Main orchestrator that runs a separate PSD analysis for EACH configured time range.
@@ -135,6 +135,7 @@ def run_psd_analysis(selections, params, file_map, load_mat_file_func):
         if not file_item: continue
         
         mat_contents = load_mat_file_func(file_item)
+        
         if mat_contents is None: continue
 
         for channel_name, time_ranges in channels.items():
@@ -146,11 +147,11 @@ def run_psd_analysis(selections, params, file_map, load_mat_file_func):
             # Loop for each individual time range
             for time_range in time_ranges:
                 time_range_str = f"{time_range[0]}-{time_range[1]}s"
-                
                 channel_data = mat_contents[channel_name]
+                
                 signal_values = channel_data['values'].flatten()
                 available_fields = channel_data.dtype.names if hasattr(channel_data, 'dtype') else channel_data.keys()
-
+                
                 if 'times' in available_fields:
                     time_vector = channel_data['times'].flatten()
                     duration = time_vector[-1] - time_vector[0]

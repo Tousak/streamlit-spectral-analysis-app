@@ -6,6 +6,12 @@ from src import main_FE, utils, file_loader, PSD, PAC, Comudologram, coherence, 
 import re
 from src import file_loader
 import matplotlib.pyplot as plt
+import pandas as pd
+import io
+import zipfile
+from src import utils
+import plotly.graph_objects as go
+from matplotlib.figure import Figure as MatplotlibFigure
 
 for key in [
     "psd_results", "psd_figures", "pac_figures", "pac_results",
@@ -304,8 +310,7 @@ if 'comod_figures' in st.session_state and st.session_state.comod_figures:
     )
     if selected_plots:
         for plot_title in selected_plots:
-            st.plotly_chart(plot_options[plot_title], use_container_width=True)       
-
+            st.pyplot(plot_options[plot_title], use_container_width=True)     
 
 ############ Export ##############
 
@@ -315,10 +320,104 @@ if 'results' not in st.session_state:
     st.session_state.results = False
 
 
+
+def export_to_excel(results_dict):
+    """
+    (Your existing function to export numerical results to Excel)
+    This function should remain as it is.
+    """
+    # ... (your existing code for creating the excel file)
+    # For example:
+    output = io.BytesIO()
+    if results_dict:
+        # This is just a placeholder for your actual excel logic
+        df = pd.DataFrame.from_dict({(i): results_dict[i] 
+                                    for i in results_dict.keys()},
+                                   orient='index')
+        df.to_excel(output)
+        output.seek(0)
+        return output
+    return None
+
 st.session_state.results = analysis_utils.calculate_hierarchical_means(merged_results)
 st.divider()
 st.header("💾 Export Results")
-# st.write(st.session_state.results)
+
+# --- GATHER ALL FIGURE DICTIONARIES (CORRECTED MERGE LOGIC) ---
+all_figures = {}
+sources = {
+    "PSD": st.session_state.get('psd_figures'),
+    "PAC": st.session_state.get('pac_figures'),
+    "COH": st.session_state.get('coh_figures'),
+    "COMOD": st.session_state.get('comod_figures')
+}
+
+figure_exist = False
+for prefix, fig_dict in sources.items():
+    if fig_dict: # Check if the dictionary exists and is not empty
+        for original_key, fig_value in fig_dict.items():
+            # Create a new, unique key
+            new_key = f"{prefix}_{original_key}"
+            all_figures[new_key] = fig_value
+            figure_exist = True
+# --- END GATHERING ---
+
+def create_figures_zip(figures_dict, image_format):
+    """
+    Creates a zip archive in memory from a complex dictionary of figures.
+
+    Args:
+        figures_dict (dict): The nested dictionary containing figures.
+        image_format (str): The desired image format ('svg' or 'png').
+
+    Returns:
+        bytes: The content of the generated zip file.
+    """
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        # Level 1: Iterate through files (e.g., "PSD_346_baseline...")
+        for file_key, channels_dict in figures_dict.items():
+            # Level 2: Iterate through channels (e.g., "Data2_Ch10")
+            for channel_key, plots_dict in channels_dict.items():
+                # Level 3: Iterate through individual plots
+                for plot_key, fig_obj in plots_dict.items():
+                    
+                    # --- Create a clean, descriptive filename ---
+                    # Remove special characters that are invalid in filenames
+                    sanitized_plot_key = re.sub(r'[\\/*?:"<>|]', "", plot_key)
+                    filename = f"{file_key}/{channel_key}/{sanitized_plot_key}.{image_format}"
+
+                    image_bytes = None
+                    try:
+                        # --- Handle Plotly Figures ---
+                        if isinstance(fig_obj, go.Figure):
+                            image_bytes = fig_obj.to_image(format=image_format)
+
+                        # --- Handle Matplotlib Figures ---
+                        elif isinstance(fig_obj, MatplotlibFigure):
+                            # Matplotlib saves to a buffer
+                            img_buffer = io.BytesIO()
+                            fig_obj.savefig(img_buffer, format=image_format, bbox_inches='tight', dpi=300)
+                            image_bytes = img_buffer.getvalue()
+                            img_buffer.close()
+                        
+                        else:
+                            # Skip if the object is not a recognized figure type
+                            st.warning(f"Skipping unrecognized object for: {filename}")
+                            continue
+
+                        # Add the generated image bytes to the zip file
+                        if image_bytes:
+                            zip_file.writestr(filename, image_bytes)
+
+                    except Exception as e:
+                        st.error(f"Failed to process '{filename}': {e}")
+
+    return zip_buffer.getvalue()
+
+
+
+
 # Check if there are any results to export
 if 'results' in st.session_state and st.session_state.results:
     if len(st.session_state.results) > 0:
@@ -327,25 +426,19 @@ if 'results' in st.session_state and st.session_state.results:
             value="analysis_results.xlsx"
         )
         
-        # --- GATHER ALL FIGURE DICTIONARIES (CORRECTED) ---
-        all_figures = {}
-        if st.session_state.get('psd_figures'):
-            all_figures.update(st.session_state.psd_figures)
-        if st.session_state.get('pac_figures'):
-            all_figures.update(st.session_state.pac_figures)
-        if st.session_state.get('coh_figures'):
-            all_figures.update(st.session_state.coh_figures)
-        if st.session_state.get('comod_figures'):
-            all_figures.update(st.session_state.comod_figures)
-        # --- END GATHERING ---
+        c1,c2,c3,c4 = st.columns([1,1,1,5])
 
         # Generate the Excel file, passing the newly created 'all_figures' dict
         excel_data = export_utils.export_to_excel(
             st.session_state.results
         )
         
+        
+
+
+
         if excel_data:
-            st.download_button(
+            c1.download_button(
                 label="📥 Download Results as Excel",
                 data=excel_data,
                 file_name=file_name_input,
@@ -353,6 +446,40 @@ if 'results' in st.session_state and st.session_state.results:
             )
         else:
             st.info("No numerical results were generated to export.")
+     
+    if figure_exist:
+
+
+
+        with c2:
+            # --- VECTOR (SVG) DOWNLOAD BUTTON ---
+            with st.spinner("Transforming figures into .svg", show_time=True):
+                svg_zip_bytes = create_figures_zip(all_figures, 'svg')
+            st.download_button(
+                label="📁 Download as Vector (.svg)",
+                data=svg_zip_bytes,
+                file_name="vector_figures.zip",
+                mime="application/zip",
+                help="Download a .zip file containing all figures in high-quality SVG format."
+            )
+
+        with c3:
+            # --- RASTER (PNG) DOWNLOAD BUTTON ---
+            with st.spinner("Transforming figures into .png", show_time=True):
+                png_zip_bytes = create_figures_zip(all_figures, 'png')
+            st.download_button(
+                label="🖼️ Download as Image (.png)",
+                data=png_zip_bytes,
+                file_name="image_figures.zip",
+                mime="application/zip",
+                help="Download a .zip file containing all figures in standard PNG format."
+            )
+    else:
+        st.info("Generate figures to enable download.")
+
+
+            
+
 else:
     st.warning("No results to export. Please run an analysis first.")
 
@@ -369,18 +496,3 @@ else:
 
 
 
-
-
-
-
-
-
-
-
-
-# PAC_state = params_pac['PAC_state']; phase_freq_band = params_pac['phase_freq_band']; Amp_freq_band1 = params_pac['Amp_freq_band1']
-# Amp_freq_band2 = params_pac['Amp_freq_band2']; n_bins = params_pac['n_bins']; slide_state = params_pac['slide_state']
-# sliding_window_duration_s = params_pac['sliding_window_duration_s']; overlap_sliding = params_pac['overlap_sliding']; comudolo_state = params_pac['comudolo_state']
-# phase_vec_start = params_pac['phase_vec_start']; phase_vec_dt = params_pac['phase_vec_dt']; phase_vec_end = params_pac['phase_vec_end']
-# amp_vec_start = params_pac['amp_vec_start']; amp_vec_dt = params_pac['amp_vec_dt']; amp_vec_end = params_pac['amp_vec_end']
-# cax_cmd_vals = params_pac['cax_cmd_vals']
