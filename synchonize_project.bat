@@ -10,8 +10,4 @@ git pull
 ECHO "Installing requirements..."
 pip install -r requirements.txt
 
-ECHO "Starting Streamlit app..."
-streamlit run app.py
-
-ECHO "Streamlit server has been stopped."
 pause
