@@ -126,10 +126,6 @@ if st.session_state.file_list and choosed:
                 st.session_state.psd_figures = psd_figures
             st.success("PSD Analysis Complete!")
 
-        # --- Display Numerical Results First ---
-        with st.expander("Show Numerical PSD Results"):
-            st.json(st.session_state.results)
-
 if st.session_state.get('psd_figures') and st.session_state.psd_figures:
     # --- NEW LOGIC TO GROUP PLOTS ---
     plot_groups = {} # A dict to map a single name to a LIST of figures
@@ -200,6 +196,7 @@ if st.session_state.file_list and choosed:
 
         st.success("PAC Analysis Complete!")
 
+# st.write(st.session_state.pac_figures)
 if st.session_state.get('pac_figures') and st.session_state.pac_figures:    
     plot_options = {} # Using a dict to map descriptive titles to figure objects
     pac_figures = st.session_state.pac_figures
