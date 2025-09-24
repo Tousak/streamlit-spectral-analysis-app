@@ -2,6 +2,14 @@ import pandas as pd
 from io import BytesIO
 from openpyxl.drawing.image import Image
 import matplotlib.pyplot as plt
+from matplotlib.figure import Figure as MatplotlibFigure
+import io
+import re
+import streamlit as st
+import zipfile
+import plotly.graph_objects as go
+import concurrent.futures
+
 
 # --- Ensure all your flattening helper functions are in this file ---
 def _flatten_psd_results(psd_data):
@@ -103,3 +111,136 @@ def export_to_excel(all_results):
         return output.getvalue()
     else:
         return None
+
+
+
+# Helper function to convert a single figure to bytes.
+# This makes it easy to run this specific task in a separate thread.
+def _convert_figure_to_bytes(fig_obj, image_format):
+    """Converts a single Plotly or Matplotlib figure to image bytes."""
+    if isinstance(fig_obj, go.Figure):
+        # For Plotly figures
+        return fig_obj.to_image(format=image_format)
+    
+    elif isinstance(fig_obj, MatplotlibFigure):
+        # For Matplotlib figures
+        img_buffer = io.BytesIO()
+        # Consider making DPI an optional parameter for even faster PNG generation
+        dpi = 150 if image_format == 'png' else 300 
+        fig_obj.savefig(img_buffer, format=image_format, bbox_inches='tight', dpi=dpi)
+        return img_buffer.getvalue()
+        
+    return None # Return None for unrecognized types
+
+
+@st.cache_data
+def create_figures_zip_fast(cache_key, _figures_dict, image_format):
+    """
+    Creates a zip archive in memory by converting figures to images in parallel.
+    The `cache_key` parameter is used by Streamlit to track changes.
+    The `_figures_dict` is ignored by the cache (due to the underscore) but
+    is used by the function's logic.
+    """
+    print(f"CACHE MISS: Generating new ZIP file for key: {cache_key} and format: {image_format}") # For debugging
+    
+    zip_buffer = io.BytesIO()
+    
+    # Flatten the nested dictionary into a list of (path, figure_object) tuples
+    tasks = []
+    # Use the ignored _figures_dict for the actual work
+    for file_key, channels_dict in _figures_dict.items():
+        for channel_key, plots_dict in channels_dict.items():
+            for plot_key, fig_obj in plots_dict.items():
+                sanitized_plot_key = re.sub(r'[\\/*?:"<>|]', "", plot_key)
+                filename = f"{file_key}/{channel_key}/{sanitized_plot_key}.{image_format}"
+                tasks.append((filename, fig_obj))
+
+    # The rest of your function remains exactly the same...
+    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_to_filename = {
+                executor.submit(_convert_figure_to_bytes, fig_obj, image_format): filename
+                for filename, fig_obj in tasks
+            }
+            for future in concurrent.futures.as_completed(future_to_filename):
+                filename = future_to_filename[future]
+                try:
+                    image_bytes = future.result()
+                    if image_bytes:
+                        zip_file.writestr(filename, image_bytes)
+                except Exception as e:
+                    st.error(f"Failed to process '{filename}': {e}")
+
+    return zip_buffer.getvalue()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# def create_figures_zip(figures_dict, image_format):
+#     """
+#     Creates a zip archive in memory from a complex dictionary of figures.
+
+#     Args:
+#         figures_dict (dict): The nested dictionary containing figures.
+#         image_format (str): The desired image format ('svg' or 'png').
+
+#     Returns:
+#         bytes: The content of the generated zip file.
+#     """
+#     zip_buffer = io.BytesIO()
+#     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
+#         # Level 1: Iterate through files (e.g., "PSD_346_baseline...")
+#         for file_key, channels_dict in figures_dict.items():
+#             # Level 2: Iterate through channels (e.g., "Data2_Ch10")
+#             for channel_key, plots_dict in channels_dict.items():
+#                 # Level 3: Iterate through individual plots
+#                 for plot_key, fig_obj in plots_dict.items():
+                    
+#                     # --- Create a clean, descriptive filename ---
+#                     # Remove special characters that are invalid in filenames
+#                     sanitized_plot_key = re.sub(r'[\\/*?:"<>|]', "", plot_key)
+#                     filename = f"{file_key}/{channel_key}/{sanitized_plot_key}.{image_format}"
+
+#                     image_bytes = None
+#                     try:
+#                         # --- Handle Plotly Figures ---
+#                         if isinstance(fig_obj, go.Figure):
+#                             image_bytes = fig_obj.to_image(format=image_format)
+
+#                         # --- Handle Matplotlib Figures ---
+#                         elif isinstance(fig_obj, MatplotlibFigure):
+#                             # Matplotlib saves to a buffer
+#                             img_buffer = io.BytesIO()
+#                             fig_obj.savefig(img_buffer, format=image_format, bbox_inches='tight', dpi=300)
+#                             image_bytes = img_buffer.getvalue()
+#                             img_buffer.close()
+                        
+#                         else:
+#                             # Skip if the object is not a recognized figure type
+#                             st.warning(f"Skipping unrecognized object for: {filename}")
+#                             continue
+
+#                         # Add the generated image bytes to the zip file
+#                         if image_bytes:
+#                             zip_file.writestr(filename, image_bytes)
+
+#                     except Exception as e:
+#                         st.error(f"Failed to process '{filename}': {e}")
+
+#     return zip_buffer.getvalue()

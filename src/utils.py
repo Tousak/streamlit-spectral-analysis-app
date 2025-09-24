@@ -2,7 +2,7 @@ import re
 import streamlit as st
 from functools import partial
 from scipy import signal
-
+from src import export_utils
 
 def set_calculated_values_in_session_state():
     """Set the comod_figures state flag to False."""
@@ -19,6 +19,12 @@ def set_calculated_values_in_session_state():
     
     st.session_state.comod_figures = False
     st.session_state.results_with_means = False
+
+    st.session_state.results = False
+    export_utils.create_figures_zip_fast.clear()
+    st.session_state.png_zip_bytes = None
+    st.session_state.svg_zip_bytes = None
+
 # Pre-make the partial so it can be used directly in widgets
 reset_values = partial(set_calculated_values_in_session_state)
 

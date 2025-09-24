@@ -8,10 +8,9 @@ from src import file_loader
 import matplotlib.pyplot as plt
 import pandas as pd
 import io
-import zipfile
+
 from src import utils
-import plotly.graph_objects as go
-from matplotlib.figure import Figure as MatplotlibFigure
+
 
 for key in [
     "psd_results", "psd_figures", "pac_figures", "pac_results",
@@ -91,7 +90,7 @@ if st.session_state.file_list and choosed:
     }
 
     st.divider()
-    PAC_calc_state = st.toggle('Activate PAC calculations')
+    PAC_calc_state = st.toggle('Activate PAC calculations', on_change=utils.reset_values)
     if PAC_calc_state:
         
         st.subheader('PAC settings')
@@ -127,54 +126,72 @@ if st.session_state.file_list and choosed:
             st.success("PSD Analysis Complete!")
 
 if st.session_state.get('psd_figures') and st.session_state.psd_figures:
-    # --- NEW LOGIC TO GROUP PLOTS ---
-    plot_groups = {} # A dict to map a single name to a LIST of figures
+    
+    plot_groups = {} 
 
-    # Loop through the nested figure structure to group plots by analysis
     for file_name, channel_figs_dict in st.session_state.psd_figures.items():
         for channel_name, named_figs in channel_figs_dict.items():
-            # This dictionary now contains figures grouped by their time range
-            # e.g., {'10-20s': [fig_psd, fig_bar], '30-40s': [fig_psd, fig_bar]}
+            
             figures_by_timerange = {}
 
-            # We need to parse the plot titles to group them
             for plot_name, fig in named_figs.items():
-                # Extract the time range (e.g., "10-20s") from the plot name
-                match = re.search(r'\((\d{1,4}\.?\d*-\d{1,4}\.?\d*s)\)', plot_name)
+                match = re.search(r'(\d{1,4}\.?\d*-\d{1,4}\.?\d*s)', plot_name)
                 if match:
                     time_range_str = match.group(1)
-                    # Initialize the list for this time range if it doesn't exist
-                    figures_by_timerange.setdefault(time_range_str, []).append(fig)
+                    
+                    # 💡 CHANGE 1: The value is now a DICTIONARY, not a list.
+                    # This lets us store plots by name.
+                    figures_by_timerange.setdefault(time_range_str, {
+                        'main_plots': {},
+                        'spectrogram': {}
+                    })
+                    
+                    if "Spectrogram" in plot_name:
+                        # Store the spectrogram with its full name as the key
+                        figures_by_timerange[time_range_str]['spectrogram'][plot_name] = fig
+                    else:
+                        # Store main plots with their full name as the key
+                        figures_by_timerange[time_range_str]['main_plots'][plot_name] = fig
 
-            # Now create the final options for the multiselect
-            for time_range, fig_list in figures_by_timerange.items():
-                group_name = f"{file_name} -> {utils.extract_short_name(channel_name)} ({time_range})"
-                plot_groups[group_name] = fig_list
+            for time_range, groups in figures_by_timerange.items():
+                if groups['main_plots']:
+                    group_name = f"{file_name} -> {channel_name} ({time_range}) - Main Plots"
+                    plot_groups[group_name] = groups['main_plots']
+                
+                if groups['spectrogram']:
+                    group_name = f"{file_name} -> {channel_name} ({time_range}) - Spectrogram"
+                    plot_groups[group_name] = groups['spectrogram']
     
     st.subheader("📊 PSD Plots")
-    st.info("Each option in the dropdown represents a full analysis for a specific time slice. Selecting one will show all associated plots.")
+    st.info("Select an analysis group to display its plots.")
 
-    # Create the multiselect widget using the new group names
     selected_groups = st.multiselect(
-        "Select an analysis to display its plots:",
+        "Select an analysis to display:",
         options=list(plot_groups.keys())
     )
 
-    # Display all plots for each selected group
+    # --- 💡 CHANGE 2: Updated Display Logic ---
     if selected_groups:
         for group_name in selected_groups:
             st.markdown(f"### Displaying plots for: **{group_name}**")
-            # Get the list of figures for this group
+            
+            # This is now a DICTIONARY of {plot_name: fig_object}
             figs_to_display = plot_groups[group_name]
-            cnt = 1
-            c1,c2 = st.columns(2)
-            # Display each figure in the list
-            for fig in figs_to_display:
-                if cnt < 3:
-                    c1.plotly_chart(fig, use_container_width=True)
-                else:
-                    c2.plotly_chart(fig, use_container_width=True)
-                cnt += 1
+            
+            # --- If it's the Main Plots group, use a 2-column layout ---
+            if "Main Plots" in group_name:
+                col1, col2 = st.columns(2)
+                for plot_name, fig in figs_to_display.items():
+                    if "Signal" in plot_name or "PSD" in plot_name:
+                        col1.plotly_chart(fig, use_container_width=True, key=plot_name)
+                    elif "Band Power" in plot_name:
+                        col2.plotly_chart(fig, use_container_width=True, key=plot_name)
+            
+            # --- Otherwise (for the Spectrogram), display normally ---
+            else:
+                for plot_name, fig in figs_to_display.items():
+                    st.plotly_chart(fig, use_container_width=True, key=plot_name)
+
             st.divider()
 
 
@@ -196,7 +213,6 @@ if st.session_state.file_list and choosed:
 
         st.success("PAC Analysis Complete!")
 
-# st.write(st.session_state.pac_figures)
 if st.session_state.get('pac_figures') and st.session_state.pac_figures:    
     plot_options = {} # Using a dict to map descriptive titles to figure objects
     pac_figures = st.session_state.pac_figures
@@ -359,58 +375,7 @@ for prefix, fig_dict in sources.items():
             figure_exist = True
 # --- END GATHERING ---
 
-def create_figures_zip(figures_dict, image_format):
-    """
-    Creates a zip archive in memory from a complex dictionary of figures.
 
-    Args:
-        figures_dict (dict): The nested dictionary containing figures.
-        image_format (str): The desired image format ('svg' or 'png').
-
-    Returns:
-        bytes: The content of the generated zip file.
-    """
-    zip_buffer = io.BytesIO()
-    with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        # Level 1: Iterate through files (e.g., "PSD_346_baseline...")
-        for file_key, channels_dict in figures_dict.items():
-            # Level 2: Iterate through channels (e.g., "Data2_Ch10")
-            for channel_key, plots_dict in channels_dict.items():
-                # Level 3: Iterate through individual plots
-                for plot_key, fig_obj in plots_dict.items():
-                    
-                    # --- Create a clean, descriptive filename ---
-                    # Remove special characters that are invalid in filenames
-                    sanitized_plot_key = re.sub(r'[\\/*?:"<>|]', "", plot_key)
-                    filename = f"{file_key}/{channel_key}/{sanitized_plot_key}.{image_format}"
-
-                    image_bytes = None
-                    try:
-                        # --- Handle Plotly Figures ---
-                        if isinstance(fig_obj, go.Figure):
-                            image_bytes = fig_obj.to_image(format=image_format)
-
-                        # --- Handle Matplotlib Figures ---
-                        elif isinstance(fig_obj, MatplotlibFigure):
-                            # Matplotlib saves to a buffer
-                            img_buffer = io.BytesIO()
-                            fig_obj.savefig(img_buffer, format=image_format, bbox_inches='tight', dpi=300)
-                            image_bytes = img_buffer.getvalue()
-                            img_buffer.close()
-                        
-                        else:
-                            # Skip if the object is not a recognized figure type
-                            st.warning(f"Skipping unrecognized object for: {filename}")
-                            continue
-
-                        # Add the generated image bytes to the zip file
-                        if image_bytes:
-                            zip_file.writestr(filename, image_bytes)
-
-                    except Exception as e:
-                        st.error(f"Failed to process '{filename}': {e}")
-
-    return zip_buffer.getvalue()
 
 
 
@@ -448,29 +413,49 @@ if 'results' in st.session_state and st.session_state.results:
 
 
 
+        results_key = tuple(sorted(st.session_state.results.keys()))
+
         with c2:
-            # --- VECTOR (SVG) DOWNLOAD BUTTON ---
-            with st.spinner("Transforming figures into .svg", show_time=True):
-                svg_zip_bytes = create_figures_zip(all_figures, 'svg')
-            st.download_button(
-                label="📁 Download as Vector (.svg)",
-                data=svg_zip_bytes,
-                file_name="vector_figures.zip",
-                mime="application/zip",
-                help="Download a .zip file containing all figures in high-quality SVG format."
-            )
+            
+            if 'svg_zip_bytes' not in st.session_state:
+                st.session_state.svg_zip_bytes = None
+            
+            if st.button('Convert figures to svg', key='button_svg', width="stretch"):
+
+                with st.spinner("Preparing vector figures (.svg)..."):
+                    st.session_state.svg_zip_bytes = export_utils.create_figures_zip_fast(
+                        results_key,  # The key for caching
+                        all_figures,  # The unhashable data (note: no underscore here)
+                        'svg'
+                    )
+            
+            if st.session_state.svg_zip_bytes is not None:
+                st.download_button(
+                    label="📁 Download as Vector (.svg)",
+                    data=st.session_state.svg_zip_bytes,
+                    file_name="vector_figures.zip",
+                    mime="application/zip"
+                )
 
         with c3:
-            # --- RASTER (PNG) DOWNLOAD BUTTON ---
-            with st.spinner("Transforming figures into .png", show_time=True):
-                png_zip_bytes = create_figures_zip(all_figures, 'png')
-            st.download_button(
-                label="🖼️ Download as Image (.png)",
-                data=png_zip_bytes,
-                file_name="image_figures.zip",
-                mime="application/zip",
-                help="Download a .zip file containing all figures in standard PNG format."
-            )
+
+            if 'png_zip_bytes' not in st.session_state:
+                st.session_state.png_zip_bytes = None
+            
+            if st.button('Convert figures to png', key='button_png', width="stretch"):
+                with st.spinner("Preparing image figures (.png)..."):
+                    st.session_state.png_zip_bytes = export_utils.create_figures_zip_fast(
+                        results_key, 
+                        all_figures, 
+                        'png'
+                    )
+            if st.session_state.png_zip_bytes is not None:
+                st.download_button(
+                    label="🖼️ Download as Image (.png)",
+                    data=st.session_state.png_zip_bytes,
+                    file_name="image_figures.zip",
+                    mime="application/zip"
+                )
     else:
         st.info("Generate figures to enable download.")
 

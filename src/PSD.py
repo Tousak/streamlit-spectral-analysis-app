@@ -21,6 +21,7 @@ def time_slicer_and_spectrogram(data, times, time_intervals, fs, spec_win, spec_
         s1_slice, t1_slice = data[id_st:id_end], times[id_st:id_end]
         s_sliced = np.concatenate((s_sliced, s1_slice)) if s_sliced.size else s1_slice
         t_sliced = np.concatenate((t_sliced, t1_slice)) if t_sliced.size else t1_slice
+        
         if spec_stat:
             nfft = len(spec_win)
             f_spec, t_spec, Sxx = signal.spectrogram(s1_slice, fs, window=spec_win, noverlap=spec_nover, nfft=nfft)
