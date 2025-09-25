@@ -24,6 +24,8 @@ def set_calculated_values_in_session_state():
     export_utils.create_figures_zip_fast.clear()
     st.session_state.png_zip_bytes = None
     st.session_state.svg_zip_bytes = None
+    st.session_state.button_png = False
+    st.session_state.button_svg = False
 
 # Pre-make the partial so it can be used directly in widgets
 reset_values = partial(set_calculated_values_in_session_state)

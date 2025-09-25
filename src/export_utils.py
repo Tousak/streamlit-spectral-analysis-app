@@ -157,7 +157,7 @@ def create_figures_zip_fast(cache_key, _figures_dict, image_format):
 
     # The rest of your function remains exactly the same...
     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
             future_to_filename = {
                 executor.submit(_convert_figure_to_bytes, fig_obj, image_format): filename
                 for filename, fig_obj in tasks
