@@ -23,7 +23,7 @@ def _calculate_and_plot_coheregram(signal1_slice, signal2_slice, fs, plot_title,
     """
     Calculates and plots a time-resolved coheregram (heatmap) with spectral smoothing.
     """
-    st.write(f'F_h: {F_h} || time_res: {time_res} || freq_res: {freq_res}')
+    # st.write(f'F_h: {F_h} || time_res: {time_res} || freq_res: {freq_res}')
     
     # --- NEW: Detrend signals to remove DC offset before analysis ---
     # This is the key step to prevent artificially high coherence at low frequencies.
