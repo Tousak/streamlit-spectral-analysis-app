@@ -124,11 +124,10 @@ if st.session_state.file_list and choosed:
                 st.session_state.psd_results = psd_results
                 st.session_state.psd_figures = psd_figures
             st.success("PSD Analysis Complete!")
-st.write(st.session_state.psd_results)
-if st.session_state.get('psd_figures') and st.session_state.psd_figures:
-    
-    plot_groups = {} 
 
+
+if st.session_state.get('psd_figures') and st.session_state.psd_figures:
+    plot_groups = {} 
     for file_name, channel_figs_dict in st.session_state.psd_figures.items():
         for channel_name, named_figs in channel_figs_dict.items():
             
