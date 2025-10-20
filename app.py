@@ -124,7 +124,7 @@ if st.session_state.file_list and choosed:
                 st.session_state.psd_results = psd_results
                 st.session_state.psd_figures = psd_figures
             st.success("PSD Analysis Complete!")
-
+st.write(st.session_state.psd_results)
 if st.session_state.get('psd_figures') and st.session_state.psd_figures:
     
     plot_groups = {} 
@@ -392,7 +392,8 @@ if 'results' in st.session_state and st.session_state.results:
 
         # Generate the Excel file, passing the newly created 'all_figures' dict
         excel_data = export_utils.export_to_excel(
-            st.session_state.results
+            st.session_state.results,
+            params
         )
         
         

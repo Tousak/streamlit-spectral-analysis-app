@@ -9,7 +9,60 @@ import streamlit as st
 import zipfile
 import plotly.graph_objects as go
 import concurrent.futures
+import numpy as np
+# export_utils.py
 
+def _flatten_full_psd_results(psd_data, f_h): # <-- Add f_h argument
+    """
+    Flattens the full PSD results into a wide format for Excel export.
+    Filters frequencies up to f_h.
+    Creates two rows for each time slice: one for raw power and one for log10 power (dB).
+    """
+    rows = []
+    for file_name, channels in psd_data.items():
+        if not isinstance(channels, dict): continue
+        for channel_name, time_slices in channels.items():
+            if not isinstance(time_slices, dict): continue
+            for time_slice, values in time_slices.items():
+                if isinstance(values, dict) and 'full_psd' in values:
+                    full_psd = values['full_psd']
+                    
+                    # Get all frequencies and powers
+                    all_frequencies = np.array(full_psd.get('frequencies', []))
+                    all_powers = np.array(full_psd.get('power', []))
+                    
+                    # --- NEW: Filter data based on f_h ---
+                    valid_indices = np.where(all_frequencies <= f_h)[0]
+                    if valid_indices.size == 0: continue # Skip if no data in range
+                    
+                    # Apply the filter to get only the data you need
+                    frequencies = all_frequencies[valid_indices]
+                    powers = all_powers[valid_indices]
+                    # --- END OF NEW SECTION ---
+
+                    base_metadata = {
+                        'File': file_name,
+                        'Channel': channel_name,
+                        'Time_Slice': time_slice,
+                    }
+                    
+                    # 1. Create and append the Raw Power Row
+                    raw_row_data = base_metadata.copy()
+                    raw_row_data['Scale'] = 'Raw'
+                    raw_power_dict = {f"{freq:.4f}": power for freq, power in zip(frequencies, powers)}
+                    raw_row_data.update(raw_power_dict)
+                    rows.append(raw_row_data)
+
+                    # 2. Create and append the Log Power (dB) Row
+                    epsilon = np.finfo(float).eps
+                    log_powers = 10 * np.log10(powers + epsilon)
+                    
+                    log_row_data = base_metadata.copy()
+                    log_row_data['Scale'] = 'Log10 (dB)'
+                    log_power_dict = {f"{freq:.4f}": log_power for freq, log_power in zip(frequencies, log_powers)}
+                    log_row_data.update(log_power_dict)
+                    rows.append(log_row_data)
+    return rows
 
 # --- Ensure all your flattening helper functions are in this file ---
 def _flatten_psd_results(psd_data):
@@ -55,10 +108,12 @@ def _flatten_coh_results(coh_data):
     return rows
 
 
-def export_to_excel(all_results):
+# export_utils.py
+
+def export_to_excel(all_results, params):
     """
     Main function to export results to a multi-sheet Excel file.
-    (Corrected version with proper band labeling and PAC grand mean handling)
+    (Now includes raw and log full PSD data)
     """
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
@@ -70,6 +125,25 @@ def export_to_excel(all_results):
         if psd_rows:
             pd.DataFrame(psd_rows).to_excel(writer, sheet_name='PSD_Summary', index=False)
 
+        # --- UPDATED SECTION for Full PSD ---
+        f_h = params.get('F_h', 100)
+        full_psd_rows = _flatten_full_psd_results(
+            all_results.get('psd_results', {}),
+            f_h
+            )
+        if full_psd_rows:
+            df_full_psd = pd.DataFrame(full_psd_rows)
+            # Add 'Scale' to the list of metadata columns for sorting
+            metadata_cols = ['File', 'Channel', 'Time_Slice', 'Scale']
+            freq_cols = sorted(
+                [col for col in df_full_psd.columns if col not in metadata_cols],
+                key=float
+            )
+            # Reorder DataFrame columns
+            df_full_psd = df_full_psd[metadata_cols + freq_cols]
+            df_full_psd.to_excel(writer, sheet_name='PSD_Full', index=False)
+        # --- END OF UPDATED SECTION ---
+
         pac_rows = _flatten_pac_results(all_results.get('pac_results', {}))
         if pac_rows:
             pd.DataFrame(pac_rows).to_excel(writer, sheet_name='PAC_Summary', index=False)
@@ -78,33 +152,27 @@ def export_to_excel(all_results):
         if coh_rows:
             pd.DataFrame(coh_rows).to_excel(writer, sheet_name='Coherence_Summary', index=False)
 
-        # --- 2. Write Grand Mean Sheets (Corrected) ---
-        # PSD Grand Mean
+        # --- 2. Write Grand Mean Sheets (No changes needed here) ---
+        # ... (rest of your function remains the same) ...
         psd_summary = all_results.get('psd_results', {})
         if 'grand_mean' in psd_summary:
             df_psd_mean = pd.DataFrame(psd_summary['grand_mean'])
-            df_psd_mean['Band'] = band_labels # Add the band names
+            df_psd_mean['Band'] = band_labels
             df_psd_mean.to_excel(writer, sheet_name='Grand_Mean_PSD', index=False)
 
-        # --- PAC Grand Mean (Corrected for two-row format) ---
         pac_summary = all_results.get('pac_results', {})
         if 'grand_mean' in pac_summary and 'grand_sem' in pac_summary:
             mean_data = pac_summary['grand_mean']
             sem_data = pac_summary['grand_sem']
-            
-            # Create two dictionaries, one for each row
-            mean_row = {'Metric': 'Mean', 'MI': mean_data.get('MI'), 'MVL': mean_data.get('MVL'), 'PLV': mean_data.get('PLV')}
-            sem_row = {'Metric': 'SEM', 'MI': sem_data.get('MI'), 'MVL': sem_data.get('MVL'), 'PLV': sem_data.get('PLV')}
-            
-            # Create the DataFrame from a list of the two rows
+            mean_row = {'Metric': 'Mean', **mean_data}
+            sem_row = {'Metric': 'SEM', **sem_data}
             df_pac_mean = pd.DataFrame([mean_row, sem_row])
             df_pac_mean.to_excel(writer, sheet_name='Grand_Mean_PAC', index=False)
 
-        # Coherence Grand Mean
         coh_summary = all_results.get('coh_results', {})
         if 'grand_mean' in coh_summary:
             df_coh_mean = pd.DataFrame(coh_summary['grand_mean'])
-            df_coh_mean['Band'] = band_labels # Add the band names
+            df_coh_mean['Band'] = band_labels
             df_coh_mean.to_excel(writer, sheet_name='Grand_Mean_Coherence', index=False)
 
     if writer.sheets:
@@ -180,68 +248,3 @@ def create_figures_zip_fast(cache_key, _figures_dict, image_format):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-# def create_figures_zip(figures_dict, image_format):
-#     """
-#     Creates a zip archive in memory from a complex dictionary of figures.
-
-#     Args:
-#         figures_dict (dict): The nested dictionary containing figures.
-#         image_format (str): The desired image format ('svg' or 'png').
-
-#     Returns:
-#         bytes: The content of the generated zip file.
-#     """
-#     zip_buffer = io.BytesIO()
-#     with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_file:
-#         # Level 1: Iterate through files (e.g., "PSD_346_baseline...")
-#         for file_key, channels_dict in figures_dict.items():
-#             # Level 2: Iterate through channels (e.g., "Data2_Ch10")
-#             for channel_key, plots_dict in channels_dict.items():
-#                 # Level 3: Iterate through individual plots
-#                 for plot_key, fig_obj in plots_dict.items():
-                    
-#                     # --- Create a clean, descriptive filename ---
-#                     # Remove special characters that are invalid in filenames
-#                     sanitized_plot_key = re.sub(r'[\\/*?:"<>|]', "", plot_key)
-#                     filename = f"{file_key}/{channel_key}/{sanitized_plot_key}.{image_format}"
-
-#                     image_bytes = None
-#                     try:
-#                         # --- Handle Plotly Figures ---
-#                         if isinstance(fig_obj, go.Figure):
-#                             image_bytes = fig_obj.to_image(format=image_format)
-
-#                         # --- Handle Matplotlib Figures ---
-#                         elif isinstance(fig_obj, MatplotlibFigure):
-#                             # Matplotlib saves to a buffer
-#                             img_buffer = io.BytesIO()
-#                             fig_obj.savefig(img_buffer, format=image_format, bbox_inches='tight', dpi=300)
-#                             image_bytes = img_buffer.getvalue()
-#                             img_buffer.close()
-                        
-#                         else:
-#                             # Skip if the object is not a recognized figure type
-#                             st.warning(f"Skipping unrecognized object for: {filename}")
-#                             continue
-
-#                         # Add the generated image bytes to the zip file
-#                         if image_bytes:
-#                             zip_file.writestr(filename, image_bytes)
-
-#                     except Exception as e:
-#                         st.error(f"Failed to process '{filename}': {e}")
-
-#     return zip_buffer.getvalue()
