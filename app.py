@@ -16,6 +16,8 @@ for key in [
     if key not in st.session_state:
         st.session_state[key] = False
 
+start_button = False # Initialize start_button
+
 
 
 # --- Page Configuration ---
