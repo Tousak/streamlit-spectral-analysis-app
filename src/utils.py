@@ -30,7 +30,17 @@ def set_calculated_values_in_session_state():
 # Pre-make the partial so it can be used directly in widgets
 reset_values = partial(set_calculated_values_in_session_state)
 
-
+def has_non_empty_third_level(data: dict) -> bool:
+    """
+    Check if any third-level value in the nested dictionary is non-empty.
+    Returns True if at least one is non-empty, otherwise False.
+    """
+    for second_level in data.values():
+        if isinstance(second_level, dict):
+            for third_level_value in second_level.values():
+                if third_level_value:  # Non-empty
+                    return True
+    return False
 
 def rest_after_upload_change():
     st.session_state.selections = False
