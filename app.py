@@ -1,11 +1,8 @@
 import streamlit as st
-import numpy as np
 import scipy.signal
 import os
-from src import main_FE, utils, file_loader, PSD, PAC, Comudologram, coherence, analysis_utils, export_utils
-import re
-from src import file_loader
-import matplotlib.pyplot as plt
+from src import main_FE, utils, file_loader, PSD, PAC, Comudologram, coherence, analysis_utils, export_utils, file_loader
+from src.plotting import time_plotting, PSD_plotting, PAC_plotting, COH_plotting, COM_plotting
 import pandas as pd
 import io
 
@@ -55,25 +52,23 @@ if 'selections' in st.session_state:
     
     # Remove the old, "ghost" files from the selections state
     for file_name in files_to_remove:
-        del st.session_state.selections[file_name]            
-def has_non_empty_third_level(data: dict) -> bool:
-    """
-    Check if any third-level value in the nested dictionary is non-empty.
-    Returns True if at least one is non-empty, otherwise False.
-    """
-    for second_level in data.values():
-        if isinstance(second_level, dict):
-            for third_level_value in second_level.values():
-                if third_level_value:  # Non-empty
-                    return True
-    return False
+        del st.session_state.selections[file_name]   
+choosed = utils.has_non_empty_third_level(st.session_state.selections)
 
 
-choosed = has_non_empty_third_level(st.session_state.selections)
+# ==============================================================================
+# TIME DOMAIN SECTION
+# ==============================================================================
+st.subheader("📈 Signal in Time Domain")
+if 'selections' in st.session_state and utils.has_non_empty_third_level(st.session_state.selections):
+    time_plotting.plot_signal_from_selections(file_map)
+else:
+    st.info("Upload files and configure channels to view signals.")
 
 
-
-################# PSD ########################
+# ==============================================================================
+# PSD SECTION 
+# ==============================================================================
 if st.session_state.file_list and choosed:
 
     # PSD parametrs input
@@ -126,75 +121,15 @@ if st.session_state.file_list and choosed:
             st.success("PSD Analysis Complete!")
 
 
-if st.session_state.get('psd_figures') and st.session_state.psd_figures:
-    plot_groups = {} 
-    for file_name, channel_figs_dict in st.session_state.psd_figures.items():
-        for channel_name, named_figs in channel_figs_dict.items():
-            
-            figures_by_timerange = {}
+st.divider()
+if st.session_state.get('psd_results'):
+    PSD_plotting.plot_PSDs(params)
+else:
+    st.info("No PSD results to display")
 
-            for plot_name, fig in named_figs.items():
-                match = re.search(r'(\d{1,4}\.?\d*-\d{1,4}\.?\d*s)', plot_name)
-                if match:
-                    time_range_str = match.group(1)
-                    
-                    # 💡 CHANGE 1: The value is now a DICTIONARY, not a list.
-                    # This lets us store plots by name.
-                    figures_by_timerange.setdefault(time_range_str, {
-                        'main_plots': {},
-                        'spectrogram': {}
-                    })
-                    
-                    if "Spectrogram" in plot_name:
-                        # Store the spectrogram with its full name as the key
-                        figures_by_timerange[time_range_str]['spectrogram'][plot_name] = fig
-                    else:
-                        # Store main plots with their full name as the key
-                        figures_by_timerange[time_range_str]['main_plots'][plot_name] = fig
-
-            for time_range, groups in figures_by_timerange.items():
-                if groups['main_plots']:
-                    group_name = f"{file_name} -> {channel_name} ({time_range}) - Main Plots"
-                    plot_groups[group_name] = groups['main_plots']
-                
-                if groups['spectrogram']:
-                    group_name = f"{file_name} -> {channel_name} ({time_range}) - Spectrogram"
-                    plot_groups[group_name] = groups['spectrogram']
-    
-    st.subheader("📊 PSD Plots")
-    st.info("Select an analysis group to display its plots.")
-
-    selected_groups = st.multiselect(
-        "Select an analysis to display:",
-        options=list(plot_groups.keys())
-    )
-
-    # --- 💡 CHANGE 2: Updated Display Logic ---
-    if selected_groups:
-        for group_name in selected_groups:
-            st.markdown(f"### Displaying plots for: **{group_name}**")
-            
-            # This is now a DICTIONARY of {plot_name: fig_object}
-            figs_to_display = plot_groups[group_name]
-            
-            # --- If it's the Main Plots group, use a 2-column layout ---
-            if "Main Plots" in group_name:
-                col1, col2 = st.columns(2)
-                for plot_name, fig in figs_to_display.items():
-                    if "Signal" in plot_name or "PSD" in plot_name:
-                        col1.plotly_chart(fig, use_container_width=True, key=plot_name)
-                    elif "Band Power" in plot_name:
-                        col2.plotly_chart(fig, use_container_width=True, key=plot_name)
-            
-            # --- Otherwise (for the Spectrogram), display normally ---
-            else:
-                for plot_name, fig in figs_to_display.items():
-                    st.plotly_chart(fig, use_container_width=True, key=plot_name)
-
-            st.divider()
-
-
-####################### PAC #############################
+# ==============================================================================
+# PAC SECTION 
+# ==============================================================================
 if st.session_state.file_list and choosed:                 
     if PAC_calc_state and start_button:
 
@@ -213,40 +148,13 @@ if st.session_state.file_list and choosed:
         st.success("PAC Analysis Complete!")
 
 if st.session_state.get('pac_figures') and st.session_state.pac_figures:    
-    plot_options = {} # Using a dict to map descriptive titles to figure objects
-    pac_figures = st.session_state.pac_figures
-    # Loop through the nested figure structure to create the options
-    for file_name, channel_figs in pac_figures.items():
-        # 'figs' is a dictionary: {'plot_name': fig_object, ...}
-        for channel_name, figs in channel_figs.items():
-            # --- CHANGE IS HERE ---
-            # Loop through both the plot_name (key) and fig (value)
-            for plot_name, fig in figs.items():
-                # No need to call get_suptitle(), plot_name is already the title
-                plot_options[plot_name] = fig
-            # --- END CHANGE ---
+    PAC_plotting.plot_PAC(st.session_state.pac_figures)
+else:
+    st.info("No PAC results to display")
 
-    st.subheader("📊 PAC Plots")
-
-    # Create the multiselect widget
-    selected_plots = st.multiselect(
-        "Select plots to display:",
-        options=list(plot_options.keys()),
-        label_visibility="collapsed"
-    )
-
-    # Loop through the user's selections and display the plots
-    if selected_plots:
-        for plot_name in selected_plots:
-            fig_to_display = plot_options[plot_name]
-            # You had a 'width' parameter for st.container which is not valid.
-            # Use columns or set the page layout to 'wide' for more space.
-            with st.container(border=True):
-                st.pyplot(fig_to_display)
-                plt.close(fig_to_display)
-
-
-########################## COHERENCE ##########################
+# ==============================================================================
+# COH SECTION
+# ==============================================================================
 if st.session_state.file_list and choosed:                 
     
     if PAC_calc_state and start_button:
@@ -268,29 +176,14 @@ if st.session_state.file_list and choosed:
 # --- Display logic for Coherence plots ---
 
 if 'coh_results' in st.session_state and st.session_state.coh_results:
-    
-    # st.subheader("Numerical Coherence Results")
-    # st.json(st.session_state.coh_results)
+    COH_plotting.plot_COH(st.session_state.coh_figures)
+else:
+    st.info("No COH results to display")
 
-    # Display plots using a multiselect
-    plot_options = {}
-    for file_figs in st.session_state.coh_figures.values():
-        for pair_figs in file_figs.values():
-            for plot_name, fig in pair_figs.items():
-                plot_options[plot_name] = fig
-    
-    st.subheader("📊 Coherence Plots")
-    selected_plots = st.multiselect(
-        "Select coherence plots to display:",
-        options=list(plot_options.keys()),
-        key='coh_select'
-    )
-    if selected_plots:
-        for plot_title in selected_plots:
- 
-            st.plotly_chart(plot_options[plot_title], use_container_width=True)
 
-########################### COMUDOLOGRAM #######################
+# ==============================================================================
+# COM SECTION
+# ==============================================================================
 if st.session_state.file_list and choosed:
     if PAC_calc_state and pac_params["comudolo_state"]:                 
         if pac_params['comudolo_state'] and start_button:
@@ -308,52 +201,33 @@ if st.session_state.file_list and choosed:
 
 # --- Display logic for Comodulogram plots ---
 if 'comod_figures' in st.session_state and st.session_state.comod_figures:
-    plot_options = {}
-    for file_figs in st.session_state.comod_figures.values():
-        for chan_figs in file_figs.values():
-            for plot_name, fig in chan_figs.items():
-                plot_options[plot_name] = fig
-    
-    st.subheader("📊 Comodulogram Plots")
-    selected_plots = st.multiselect(
-        "Select comodulogram plots to display:",
-        options=list(plot_options.keys()),
-        key='comod_select'
-    )
-    if selected_plots:
-        for plot_title in selected_plots:
-            st.pyplot(plot_options[plot_title], use_container_width=True)     
+    COM_plotting.plot_COM(st.session_state.comod_figures)
+else:
+    st.info("No Comudologram results to display")
 
-############ Export ##############
 
-#Merge results
+# ==============================================================================
+# Export SECTION
+# ==============================================================================
+
 merged_results = utils.merge_results_from_session()
 if 'results' not in st.session_state:
     st.session_state.results = False
 
+# Calculate hierarchical means, which modifies merged_results in-place
+processed_results = analysis_utils.calculate_hierarchical_means(merged_results)
 
+# Update st.session_state.psd_results with the processed data
+if 'psd_results' in processed_results:
+    st.session_state.psd_results = processed_results['psd_results']
 
-def export_to_excel(results_dict):
-    """
-    (Your existing function to export numerical results to Excel)
-    This function should remain as it is.
-    """
-    # ... (your existing code for creating the excel file)
-    # For example:
-    output = io.BytesIO()
-    if results_dict:
-        # This is just a placeholder for your actual excel logic
-        df = pd.DataFrame.from_dict({(i): results_dict[i] 
-                                    for i in results_dict.keys()},
-                                   orient='index')
-        df.to_excel(output)
-        output.seek(0)
-        return output
-    return None
-
-st.session_state.results = analysis_utils.calculate_hierarchical_means(merged_results)
+st.session_state.results = processed_results
+if start_button:
+    st.rerun()
 st.divider()
-st.header("💾 Export Results")
+if st.session_state.get('results'):
+    if len(st.session_state.results) > 0:
+        st.header("💾 Export Results")
 
 # --- GATHER ALL FIGURE DICTIONARIES (CORRECTED MERGE LOGIC) ---
 all_figures = {}
@@ -363,7 +237,6 @@ sources = {
     "COH": st.session_state.get('coh_figures'),
     "COMOD": st.session_state.get('comod_figures')
 }
-
 figure_exist = False
 for prefix, fig_dict in sources.items():
     if fig_dict: # Check if the dictionary exists and is not empty
@@ -374,11 +247,6 @@ for prefix, fig_dict in sources.items():
             figure_exist = True
 # --- END GATHERING ---
 
-
-
-
-
-
 # Check if there are any results to export
 if 'results' in st.session_state and st.session_state.results:
     if len(st.session_state.results) > 0:
@@ -387,18 +255,13 @@ if 'results' in st.session_state and st.session_state.results:
             value="analysis_results.xlsx"
         )
         
-        c1,c2,c3,c4 = st.columns([1,1,1,5])
+        c1,c2,c3,c4 = st.columns([1,1,1,4])
 
         # Generate the Excel file, passing the newly created 'all_figures' dict
         excel_data = export_utils.export_to_excel(
             st.session_state.results,
             params
         )
-        
-        
-
-
-
         if excel_data:
             c1.download_button(
                 label="📥 Download Results as Excel",
@@ -410,25 +273,18 @@ if 'results' in st.session_state and st.session_state.results:
             st.info("No numerical results were generated to export.")
      
     if figure_exist:
-
-
-
         results_key = tuple(sorted(st.session_state.results.keys()))
-
+        
         with c2:
-            
             if 'svg_zip_bytes' not in st.session_state:
                 st.session_state.svg_zip_bytes = None
-            
             if st.button('Convert figures to svg', key='button_svg', width="stretch"):
-
                 with st.spinner("Preparing vector figures (.svg)..."):
                     st.session_state.svg_zip_bytes = export_utils.create_figures_zip_fast(
                         results_key,  # The key for caching
                         all_figures,  # The unhashable data (note: no underscore here)
                         'svg'
                     )
-            
             if st.session_state.svg_zip_bytes is not None:
                 st.download_button(
                     label="📁 Download as Vector (.svg)",
@@ -436,9 +292,8 @@ if 'results' in st.session_state and st.session_state.results:
                     file_name="vector_figures.zip",
                     mime="application/zip"
                 )
-
+        
         with c3:
-
             if 'png_zip_bytes' not in st.session_state:
                 st.session_state.png_zip_bytes = None
             
@@ -458,23 +313,6 @@ if 'results' in st.session_state and st.session_state.results:
                 )
     else:
         st.info("Generate figures to enable download.")
-
-
-            
-
 else:
     st.warning("No results to export. Please run an analysis first.")
-
-
-
-
-
-
-
-
-
-
-
-
-
 
