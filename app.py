@@ -149,8 +149,8 @@ if st.session_state.file_list and choosed:
 
         st.success("PAC Analysis Complete!")
 
-if st.session_state.get('pac_figures') and st.session_state.pac_figures:    
-    PAC_plotting.plot_PAC(st.session_state.pac_figures)
+if st.session_state.get('pac_results') and st.session_state.get('pac_figures'):    
+    PAC_plotting.plot_PAC(st.session_state.pac_results, st.session_state.pac_figures)
 else:
     st.info("No PAC results to display")
 
@@ -219,9 +219,13 @@ if 'results' not in st.session_state:
 # Calculate hierarchical means, which modifies merged_results in-place
 processed_results = analysis_utils.calculate_hierarchical_means(merged_results)
 
-# Update st.session_state.psd_results with the processed data
+# Update session state with the processed data for each analysis type
 if 'psd_results' in processed_results:
     st.session_state.psd_results = processed_results['psd_results']
+if 'pac_results' in processed_results:
+    st.session_state.pac_results = processed_results['pac_results']
+if 'coh_results' in processed_results:
+    st.session_state.coh_results = processed_results['coh_results']
 
 st.session_state.results = processed_results
 if start_button:

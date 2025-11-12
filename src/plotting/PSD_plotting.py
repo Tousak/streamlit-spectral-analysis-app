@@ -7,7 +7,10 @@ def plot_mean_psd_with_sem(mean_power, sem_power, frequencies, title, f_h_max):
     """
     # Ensure data are numpy arrays for filtering
     mean_power = np.array(mean_power)
-    sem_power = np.array(sem_power)
+    if sem_power is not None:
+        sem_power = np.array(sem_power)
+    else:
+        sem_power = np.zeros_like(mean_power)
     frequencies = np.array(frequencies)
 
     # Filter data up to the maximum frequency F_h
