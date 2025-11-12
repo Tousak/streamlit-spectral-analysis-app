@@ -1,142 +1,72 @@
-# Description
+# Electrophysiology Signal Analysis Suite
 
-## Electrophysiology Signal Analysis Suite
-This is a comprehensive Streamlit web application designed for the analysis of electrophysiological data (such as EEG or LFP signals) stored in .mat files. It provides a user-friendly interface to perform a variety of advanced signal processing tasks, visualize the results, and export the data for further analysis.
+## Overview
 
-The application is a Python-based replication and extension of a MATLAB analysis pipeline, offering interactive plots and flexible parameter configuration.
+This is a comprehensive Streamlit web application for the analysis of electrophysiological data (e.g., EEG, LFP) from `.mat` files. It provides a user-friendly interface to perform advanced signal processing, visualize results, and export data for publication or further analysis.
 
-## Features
-This application supports a wide range of standard electrophysiological analyses:
+The application is designed around a clear, powerful workflow:
+1.  **Configure**: Interactively load `.mat` files and select analysis channels and time ranges, either individually or for all files at once using a global settings feature.
+2.  **Calculate**: Execute a suite of signal processing tasks (PSD, PAC, Coherence, Comodulogram) with a single click.
+3.  **Aggregate**: Automatically calculate hierarchical summary statistics, including means and standard error (SEM) across time segments, channels, and entire files.
+4.  **Export**: Download all numerical results to a multi-sheet, publication-ready Excel file, and export all generated figures as high-quality images (`.svg`, `.png`) bundled into a single `.zip` archive.
 
-### Interactive Data Handling:
-Upload .mat files directly through the browser.
-For local use, load all files from a specified folder path, bypassing browser upload limits.
-Dynamically select channels and define multiple time ranges for analysis.
+## Quickstart
 
-### Power Spectral Density (PSD)
-Calculates and plots the power spectrum of a signal, including summary statistics (mean and SEM) for standard frequency bands (Delta, Theta, Alpha, Beta, Gamma).
+This project includes simple scripts for easy setup and execution on Windows.
 
-### Spectrogram
-Generates time-frequency plots to visualize how the spectral content of a signal changes over time for specific intervals.
+### 1. Clone the Repository
+First, get the project files. Open a terminal (like PowerShell or Command Prompt) and run:
+```bash
+git clone https://gitlab.com/Tousak/streamlit-spectral-analysis-app.git
+```
+This will create a `streamlit-spectral-analysis-app` folder with all the project files.
 
-### Phase-Amplitude Coupling (PAC)
-Calculates PAC metrics (Modulation Index, Mean Vector Length, Phase-Locking Value) for user-defined phase and amplitude frequency bands.
-Supports both within-channel and between-channel (cross-channel) PAC analysis.
-Includes an optional sliding-window analysis to view PAC changes over time.
+### 2. Run the Application
+Navigate into the project folder. To start the application for the first time, simply double-click the **`run_app.bat`** file.
 
-### Comodulogram
-Creates a heatmap (or smooth contour plot) of Modulation Index values across a grid of phase and amplitude frequencies to identify coupling relationships.
+This script will automatically:
+- Activate the Python virtual environment.
+- Launch the Streamlit application in your default web browser.
 
-### Coherence
-Calculates the magnitude-squared coherence between two paired channels to measure their linear correlation at different frequencies.
-Provides summary statistics for coherence within standard frequency bands.
+### 3. Update the Application
+To update the application with the latest changes from the repository, double-click the **`synchonize_project.bat`** file.
 
-### Coheregram
-Generates a time-frequency heatmap of coherence, showing how the correlation between two signals evolves over time.
+This script will:
+- Pull the latest code using `git pull`.
+- Install or update any required Python libraries from `requirements.txt`.
 
-### Data Export
-Export all numerical results (including summary statistics) to a multi-sheet Excel file.
+## Application Capabilities
 
-The Excel export can be configured to create detailed "dashboards" with plots embedded alongside the data tables.
+*   **Flexible Data Input**: Load `.mat` files via the browser uploader or by providing a local folder path to handle large collections of files.
+*   **Power Spectral Density (PSD)**: Calculate and plot the power spectrum for selected channels, including summary statistics for standard frequency bands.
+*   **Phase-Amplitude Coupling (PAC)**: Compute PAC metrics (MI, MVL, PLV) to measure cross-frequency coupling.
+*   **Comodulogram**: Generate heatmaps of PAC values across a grid of phase and amplitude frequencies to identify coupling relationships.
+*   **Coherence**: Analyze the linear correlation between channel pairs across different frequencies.
+*   **Automated Statistical Aggregation**: The application automatically calculates and organizes hierarchical means (across time, channels, and files), providing a comprehensive statistical overview.
+*   **Advanced Exporting**:
+    *   **Excel**: All numerical results, from raw values to grand means, are exported to a clean, multi-sheet `.xlsx` file.
+    *   **Figures**: All generated plots can be exported as a `.zip` archive containing high-quality vector (`.svg`) or image (`.png`) files, ready for use in presentations or publications. The figure export process is parallelized for speed.
 
-# Installation
-🚀 Getting Started
-Follow these instructions to set up and run the application on a local computer. This guide assumes you have Git and Python installed.
+## File Structure
+- **`app.py`**: The main script that runs the Streamlit application and organizes the UI.
+- **`run_app.bat`**: A script to automatically start the application on Windows.
+- **`synchonize_project.bat`**: A script to update the application from Git and install dependencies.
+- **`requirements.txt`**: A list of all Python libraries required to run the project.
+- **`src/`**: A folder containing the core logic for the application.
+    - **`PSD.py`, `PAC.py`, `coherence.py`, `Comudologram.py`**: Modules for the core signal processing calculations.
+    - **`analysis_utils.py`**: Functions for calculating hierarchical summary statistics (means, SEMs).
+    - **`export_utils.py`**: Functions for flattening data structures and exporting results to Excel and zipped figures.
+    - **`file_loader.py`**: UI and logic for file handling and analysis configuration.
+    - **`utils.py`**: General helper functions used across the application.
+    - **`plotting/`**: Modules dedicated to visualizing the results of each analysis type.
 
-## 1. Clone the Repository
-First, you need to get the project files from the Git repository.
+## Minimum System Requirements
 
-Create a Folder: Create a new, empty folder on your computer where you want to store the project (e.g., C:\Projects\AnalysisApp).
+These are estimates for running the application effectively. Requirements may increase with larger datasets or more complex analyses.
 
-Open Terminal: Right-click on the folder you just created and select "Open in Terminal" (or a similar option like "Open PowerShell window here").
-
-Clone the Code: In the terminal, run the following command. Replace <your-git-repository-ssh-link> with the actual SSH or HTTPS link from your Git provider.
-
-git clone <your-git-repository-ssh-link> .
-
-(Note: The . at the end clones the files directly into your current folder.)
-
-## 2. Set Up the Python Environment
-It is highly recommended to use a virtual environment to keep the project's dependencies isolated.
-
-Create the Environment: In the same terminal, run this command to create a virtual environment folder named .venv.
-
-python -m venv .venv
-
-Activate the Environment: To start using the environment, run the following command. You will need to do this every time you open a new terminal to work on the project.
-
-For Windows PowerShell
-.\.venv\Scripts\Activate.ps1
-
-You should see (.venv) appear at the beginning of your terminal prompt.
-
-## 3. Install Dependencies
-Install all the required Python libraries using the requirements.txt file.
-
-Install Libraries: With your virtual environment active, run this single command:
-
-pip install -r requirements.txt
-
-## 4. Run the Application
-You are now ready to start the app.
-
-Launch Streamlit: In the terminal (with the environment still active), run:
-
-streamlit run app.py
-
-View in Browser: A new tab should automatically open in your web browser with the application running, typically at http://localhost:8501.
-
-
-# How to Use the App
-## Load Data
-Use either "Option A: Upload Files" to select .mat files from your computer or, if running locally, use "Option B: Load from Folder" to load all files from a specific directory path.
-
-#### 1. Configure Files
-For each loaded file, an expander will appear.
-
-#### 2. Select Channels
-Use the multiselect box to choose which channels you want to analyze.
-
-#### 3. Define Time Ranges
-For each selected channel, a text box will appear. Enter the start and end times (in seconds) for the analysis intervals (e.g., 10 20; 30 45).
-
-## Set Analysis Parameters
-Use the global settings sections to configure the parameters for PSD, PAC, Coherence, and Comodulogram calculations.
-
-#### Run Analysis
-Click the "Start Calculation" button for the desired analysis. The app will process the data according to your configuration.
-
-## View and Export
-
-#### Plots
-After the calculation is complete, a multiselect box will appear, allowing you to choose which of the generated plots to display.
-
-#### Results
-The numerical results are stored and can be viewed in an expander.
-
-#### Export
-Click the "Download Results as Excel" button to save all numerical data to a structured .xlsx file.
-
-
-# File Structure
-**app.py:** The main script that runs the Streamlit application and organizes the UI.
-
-**requirements.txt:** A list of all Python libraries required to run the project.
-
-**src/:** A folder containing the core logic for the application.
-
-**PSD.py:** Functions for PSD and spectrogram analysis.
-
-**PAC.py:** Functions for Phase-Amplitude Coupling analysis.
-
-**Coherence.py:** Functions for coherence and coheregram analysis.
-
-**Comodulogram.py:** Functions for comodulogram analysis.
-
-**analysis_utils.py:** Functions for calculating summary statistics (means, SEMs).
-
-**export_utils.py:** Functions for exporting results to Excel.
-
-**file_loader.py:** UI and logic for file handling and channel configuration.
-
-**utils.py:** General helper functions used across the application.
+- **Operating System**: Windows (for `.bat` script compatibility). The Python code is cross-platform but the provided scripts are for Windows.
+- **CPU**: Modern multi-core processor (e.g., Intel Core i5 / AMD Ryzen 5, 4 cores or more recommended).
+- **RAM**: 
+    - **8 GB** (Minimum) for smaller datasets and basic analyses.
+    - **16 GB or more** (Recommended) for handling large data files, multiple analyses at once, or computationally intensive tasks like comodulograms.
+- **Storage**: Sufficient free space to store your `.mat` data files.
