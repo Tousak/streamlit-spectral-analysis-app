@@ -96,68 +96,119 @@ def files_struturization():
 
     if st.session_state.file_list:
         st.info("Select channels and define time ranges for each file you want to process.")
+        
+        global_settings_enabled = st.toggle("Set parameters for all files at once")
 
-        for file_item in st.session_state.file_list:
-            if isinstance(file_item, str):
-                file_name = os.path.basename(file_item)
-            else:
-                file_name = file_item.name
+        if global_settings_enabled:
+            with st.expander("Global Configuration", expanded=True):
+                # Step 1: Gather all unique SHORT channel names for the UI
+                all_short_channels = set()
+                all_long_channels = []
+                for file_item in st.session_state.file_list:
+                    mat_contents = load_mat_file(file_item)
+                    if mat_contents:
+                        # Find all relevant channel keys in the file
+                        channels_in_file = [var for var in mat_contents.keys() if re.search(r"Ch\d{1,2}", var)]
+                        all_long_channels.extend(channels_in_file)
 
-            with st.expander(f"⚙️ Configure File: **{file_name}**"):
-                mat_contents = load_mat_file(file_item)
+                # Create a unique set of the short names for the UI
+                if all_long_channels:
+                    all_short_channels = {utils.extract_short_name(c) for c in all_long_channels}
                 
-                if mat_contents is None:
-                    st.error("File could not be loaded.")
-                    continue
-
-                available_channels = sorted([
-                    var for var in mat_contents.keys() if re.search(r"Ch\d{1,2}$", var)
-                ])
-
-                if not available_channels:
-                    st.warning("No channels matching the pattern 'ChX' or 'ChXX' found.")
-                    continue
-
-                st.session_state.selections.setdefault(file_name, {})
+                sorted_short_channels = sorted(list(all_short_channels))
                 
-                # --- MODIFIED WIDGET ---
-                # We no longer assign its output to a variable.
-                # The 'on_change' parameter now handles all the logic.
-                st.multiselect(
-                    "Define Channels",
-                    options=available_channels,
-                    default=list(st.session_state.selections[file_name].keys()),
-                    key=f"multiselect_{file_name}", # The key is used to access the value in the callback
-                    on_change=handle_channel_selection_change, # This is the new, important part
-                    args=(file_name,), # Pass the file_name to the callback
-                    format_func=utils.extract_short_name
+                # The multiselect now uses the unique short names
+                global_selected_short_channels = st.multiselect(
+                    "Select Global Channels",
+                    options=sorted_short_channels,
                 )
                 
-                # This loop now iterates over the session_state dictionary, which is
-                # managed by the callback function.
-                for channel_name in st.session_state.selections[file_name]:
-                    with st.container(border=True):
-                        st.markdown(f"**Time Ranges for `{utils.extract_short_name(channel_name)}`** || Example: `10 20.5; 30 45`")
+                global_time_ranges_str = st.text_input("Enter Global Time Ranges (e.g., 10 20.5; 30 45)")
+                
+                apply_to_all = st.button("Apply to All Files")
 
-                        default_text = "; ".join([f"{r[0]} {r[1]}" for r in st.session_state.selections[file_name][channel_name]])
+                if apply_to_all:
+                    parsed_global_ranges = utils.parse_time_ranges(global_time_ranges_str)
+                    if parsed_global_ranges is not None:
+                        # Step 2: Update apply logic to map short names back to long names
+                        for file_item in st.session_state.file_list:
+                            file_name = os.path.basename(file_item) if isinstance(file_item, str) else file_item.name
+                            
+                            mat_contents = load_mat_file(file_item)
+                            if not mat_contents:
+                                continue
 
-                        text_input = st.text_input(
-                            "Time ranges:",
-                            value=default_text,
-                            key=f"text_{file_name}_{channel_name}",
-                            label_visibility='collapsed',
-                            on_change = utils.reset_values
-                        )
-                        
-                        # The parsing logic remains the same
-                        if text_input:
-                            parsed_ranges = utils.parse_time_ranges(text_input)
-                            if parsed_ranges is not None:
-                                st.session_state.selections[file_name][channel_name] = parsed_ranges
+                            st.session_state.selections[file_name] = {}
+                            
+                            # Iterate through the actual (long) channel names in the file
+                            for long_channel_name in mat_contents.keys():
+                                # Get its short name
+                                short_name = utils.extract_short_name(long_channel_name)
+                                # If its short name is in the user's global selection, apply the setting
+                                if short_name in global_selected_short_channels:
+                                    st.session_state.selections[file_name][long_channel_name] = parsed_global_ranges
+
+                        st.success("Global settings applied to all applicable files!")
+                        st.rerun()
+                    else:
+                        st.error("Invalid format for global time ranges.")
+
+        else:
+            for file_item in st.session_state.file_list:
+                if isinstance(file_item, str):
+                    file_name = os.path.basename(file_item)
+                else:
+                    file_name = file_item.name
+
+                with st.expander(f"⚙️ Configure File: **{file_name}**"):
+                    mat_contents = load_mat_file(file_item)
+                    
+                    if mat_contents is None:
+                        st.error("File could not be loaded.")
+                        continue
+
+                    available_channels = sorted([
+                        var for var in mat_contents.keys() if re.search(r"Ch\d{1,2}", var)
+                    ])
+
+                    if not available_channels:
+                        st.warning("No channels matching the pattern 'ChX' or 'ChXX' found.")
+                        continue
+
+                    st.session_state.selections.setdefault(file_name, {})
+                    
+                    st.multiselect(
+                        "Define Channels",
+                        options=available_channels,
+                        default=list(st.session_state.selections[file_name].keys()),
+                        key=f"multiselect_{file_name}",
+                        on_change=handle_channel_selection_change,
+                        args=(file_name,),
+                        format_func=utils.extract_short_name
+                    )
+                    
+                    for channel_name in st.session_state.selections[file_name]:
+                        with st.container(border=True):
+                            st.markdown(f"**Time Ranges for `{utils.extract_short_name(channel_name)}`** || Example: `10 20.5; 30 45`")
+
+                            default_text = "; ".join([f"{r[0]} {r[1]}" for r in st.session_state.selections[file_name][channel_name]])
+
+                            text_input = st.text_input(
+                                "Time ranges:",
+                                value=default_text,
+                                key=f"text_{file_name}_{channel_name}",
+                                label_visibility='collapsed',
+                                on_change = utils.reset_values
+                            )
+                            
+                            if text_input:
+                                parsed_ranges = utils.parse_time_ranges(text_input)
+                                if parsed_ranges is not None:
+                                    st.session_state.selections[file_name][channel_name] = parsed_ranges
+                                else:
+                                    st.error("Invalid format. Use space-separated numbers and semicolon-separated pairs.", icon="❗")
                             else:
-                                st.error("Invalid format. Use space-separated numbers and semicolon-separated pairs.", icon="❗")
-                        else:
-                            st.session_state.selections[file_name][channel_name] = []
+                                st.session_state.selections[file_name][channel_name] = []
     else:
         st.warning("Please upload files or load from a folder to begin.")
 

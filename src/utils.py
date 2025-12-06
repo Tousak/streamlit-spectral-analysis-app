@@ -30,7 +30,17 @@ def set_calculated_values_in_session_state():
 # Pre-make the partial so it can be used directly in widgets
 reset_values = partial(set_calculated_values_in_session_state)
 
-
+def has_non_empty_third_level(data: dict) -> bool:
+    """
+    Check if any third-level value in the nested dictionary is non-empty.
+    Returns True if at least one is non-empty, otherwise False.
+    """
+    for second_level in data.values():
+        if isinstance(second_level, dict):
+            for third_level_value in second_level.values():
+                if third_level_value:  # Non-empty
+                    return True
+    return False
 
 def rest_after_upload_change():
     st.session_state.selections = False
@@ -98,11 +108,11 @@ def extract_short_name(full_name):
     return match.group() if match else full_name
 
 def notch_filter_50hz(data, fs, F_h):
-    max_harmonic = int((F_h - 1) / 50)
+    max_harmonic = int((F_h + 1) / 50)
     filtered_data = data
     for i in range(1, max_harmonic + 1):
         f0 = 50.0 * i
-        Q = f0 / 2.0
+        Q = f0 / 1.0
         b, a = signal.iirnotch(f0, Q, fs)
         filtered_data = signal.filtfilt(b, a, filtered_data)
     return filtered_data

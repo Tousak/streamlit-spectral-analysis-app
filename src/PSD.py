@@ -43,7 +43,7 @@ def calculate_band_power(psd, freqs, bands):
     for band in bands:
         idx_band = np.where((freqs >= band[0]) & (freqs <= band[1]))[0]
         mean_power = np.mean(psd[idx_band]) if idx_band.size > 0 else 0
-        error = sem(psd[idx_band]) if idx_band.size > 0 else 0
+        error = sem(psd[idx_band]) if idx_band.size > 1 else 0.0
         band_means.append(mean_power)
         band_errors.append(error)
     return np.array(band_means), np.array(band_errors)
