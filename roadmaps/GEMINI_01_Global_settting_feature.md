@@ -65,4 +65,4 @@ This step ensures that either the global UI or the per-file UI is shown, but not
     *   After the `if global_settings_enabled:` block, add an `else:` block.
     *   Move all the existing code for the per-file expanders (the original `for file_item in st.session_state.file_list:` loop and its contents) inside this `else` block.
 
-This completes the basic implementation. When the toggle is ON, the user sees the global controls. When it's OFF, the user sees the original detailed per-file controls.
+This completes the basic implementation. When the toggle is ON, the user sees the global controls. When it's OFF, the user sees the original detailed per-file controls...
