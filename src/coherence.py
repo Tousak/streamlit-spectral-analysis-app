@@ -22,14 +22,12 @@ import streamlit as st
 def _calculate_and_plot_coheregram(signal1_slice, signal2_slice, fs, plot_title, F_h, time_res, freq_res):
     """
     Calculates and plots a time-resolved coheregram (heatmap) with spectral smoothing.
+    Now with dynamic color range for better visualization.
     """
-    # st.write(f'F_h: {F_h} || time_res: {time_res} || freq_res: {freq_res}')
-    
-    # --- NEW: Detrend signals to remove DC offset before analysis ---
-    # This is the key step to prevent artificially high coherence at low frequencies.
+
+    # --- Detrend signals to remove DC offset before analysis ---
     signal1_slice = signal.detrend(signal1_slice, type='constant')
     signal2_slice = signal.detrend(signal2_slice, type='constant')
-    # --- END NEW ---
 
     nperseg = int(fs / freq_res)
     noverlap = nperseg - int(fs * time_res)
@@ -45,16 +43,12 @@ def _calculate_and_plot_coheregram(signal1_slice, signal2_slice, fs, plot_title,
     Pyy = np.abs(Syy)**2
     Pxy = Sxx * np.conj(Syy)
 
-    # --- 3. FIX: Smooth the spectral estimates over the time axis ---
-    # This averaging is essential for a meaningful coherence calculation.
-    # The window size determines how much smoothing is applied.
-    # A size of 3-5 is often a good starting point.
-    smoothing_window_size = 5 
+    # --- 3. Smooth the spectral estimates over the time axis ---
+    smoothing_window_size = 5
     
     Pxx_smoothed = uniform_filter1d(Pxx, size=smoothing_window_size, axis=1)
     Pyy_smoothed = uniform_filter1d(Pyy, size=smoothing_window_size, axis=1)
     Pxy_smoothed = uniform_filter1d(Pxy, size=smoothing_window_size, axis=1)
-    # --- END FIX ---
 
     # --- 4. Calculate Coherence using the smoothed estimates ---
     epsilon = 1e-15
@@ -62,22 +56,36 @@ def _calculate_and_plot_coheregram(signal1_slice, signal2_slice, fs, plot_title,
     
     coheregram_real = coheregram.astype(np.float64)
 
-    # Dynamic Color Range Logic
+    # --- 5. Dynamic Color Range Logic (NEW) ---
+    # Only consider frequencies up to F_h for determining color range
     freq_indices = np.where(f <= F_h)[0]
     filtered_data = coheregram_real[freq_indices, :]
-    z_min, z_max = (np.min(filtered_data), np.max(filtered_data)) if filtered_data.size > 0 else (0, 1)
-    
-    # --- 5. Create the Smooth Contour Plot ---
+
+    if filtered_data.size > 0:
+        data_min = np.min(filtered_data)
+        data_max = np.max(filtered_data)
+        # Apply scaling: [0.9*min, 1.1*max] for better contrast
+        z_min = max(0, 0.9 * data_min)  # Don't go below 0
+        z_max = min(1, 1.1 * data_max)  # Don't go above 1 (coherence maximum)
+    else:
+        z_min, z_max = 0, 1
+
+    # --- 6. Create the Smooth Contour Plot with dynamic color range ---
     fig = go.Figure(data=go.Contour(
         z=coheregram_real,
         x=t + float(plot_title.split('(')[1].split('-')[0]),
         y=f,
         colorscale='Jet',
-        zmin=0,
-        zmax=1,
+        zmin=z_min,  # Dynamic minimum
+        zmax=z_max,  # Dynamic maximum
         colorbar={'title': 'Coherence'},
         contours_coloring='fill',
-        line_smoothing=0.85
+        line_smoothing=0.85,
+        contours=dict(
+            start=z_min,
+            end=z_max,
+            size=(z_max - z_min) / 40  # More levels for smoother appearance
+        )
     ))
     fig.update_layout(
         title=plot_title,

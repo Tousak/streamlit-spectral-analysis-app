@@ -34,7 +34,13 @@ def plot_mean_pac_barchart(mean_metrics, sem_metrics, title_prefix):
             ),
             row=1, col=i+1
         )
-        fig.update_yaxes(title_text="Value", range=[0, y_axis_upper_bound], row=1, col=i+1)
+        # Disable SI prefix (μ symbol) by setting tickformat to show full numbers
+        fig.update_yaxes(
+            title_text="Value",
+            range=[0, y_axis_upper_bound],
+            tickformat='.6f',  # Show values without SI prefixes
+            row=1, col=i+1
+        )
 
     fig.update_layout(
         title_text=title_prefix,

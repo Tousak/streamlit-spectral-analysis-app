@@ -96,8 +96,6 @@ def PAC_settings(selections):
         use_cross_channel = c1.checkbox("Enable Between-Channels Pairing", key="pac_cross_channel_toggle", on_change=utils.reset_values)
         calculate_coherence = c2.checkbox("Calculate Coherence", key="coherence_toggle", on_change=utils.reset_values)
         
-
-
         # c2, c3,c4 = st.columns(3)
         if calculate_coherence:
             calculate_coheregram =c3.checkbox("Calculate Coheregram", value=False)
@@ -109,35 +107,100 @@ def PAC_settings(selections):
                 coheregram_time_res, coheregram_freq_res, max_F_coherergam = False, False, False
         else:
             coheregram_time_res, coheregram_freq_res, max_F_coherergam, calculate_coheregram = False, False, False, False
-        pairs = {}
-        if use_cross_channel or calculate_coherence:
-            # Iterate through each file that has channels selected
-            for file_name, file_selections in selections.items():
-                # Filter out the 'pac_config' key to get only channel names
-                selected_channels = [ch for ch in file_selections.keys() if ch != 'pac_config']
-                
-                if not selected_channels: continue
 
-                with st.container(border=True):
-                    st.markdown(f"**Pairings for file: `{file_name}`**")
-                    pairs[file_name] = {}
-                    
-                    for source_channel in selected_channels:
-                        cols = st.columns([1, 2])
-                        cols[0].markdown(f"**{utils.extract_short_name(source_channel)}** pairs with:")
-                        
-                        pairing_options = ["(None)"] + selected_channels
-                        
-                        paired_channel = cols[1].selectbox(
-                            f"Select pair for {source_channel}",
-                            options=pairing_options,
-                            key=f"pair_select_{file_name}_{source_channel}",
-                            label_visibility="collapsed",
-                            format_func=utils.extract_short_name,
-                            on_change=utils.reset_values
-                        )
-                        if paired_channel != "(None)":
-                            pairs[file_name][source_channel] = paired_channel
+        pairs = {}
+        use_global_pairing = True  # Default value
+
+        if use_cross_channel or calculate_coherence:
+            # Add global pairing toggle
+            use_global_pairing = st.checkbox(
+                "Use Global Pairing (apply same pairs to all files)",
+                value=True,
+                key="global_pairing_toggle",
+                on_change=utils.reset_values,
+                help="When enabled, define channel pairs once and apply to all files. When disabled, configure pairs separately for each file."
+            )
+
+            if use_global_pairing:
+                # Global pairing: Create a single pairing interface
+                # Collect all unique channel SHORT NAMES across all files
+                all_channel_short_names = set()
+                # Also keep a mapping from short name to full channel names per file
+                short_name_to_full_names = {}
+
+                for file_name, file_selections in selections.items():
+                    selected_channels = [ch for ch in file_selections.keys() if ch != 'pac_config']
+                    for ch in selected_channels:
+                        short_name = utils.extract_short_name(ch)
+                        all_channel_short_names.add(short_name)
+                        # Map short name to full channel name for each file
+                        if short_name not in short_name_to_full_names:
+                            short_name_to_full_names[short_name] = {}
+                        short_name_to_full_names[short_name][file_name] = ch
+
+                all_channel_short_names = sorted(list(all_channel_short_names))
+
+                if all_channel_short_names:
+                    with st.container(border=True):
+                        st.markdown("**Global Channel Pairings (applied to all files)**")
+                        global_pairs = {}
+
+                        for source_short_name in all_channel_short_names:
+                            cols = st.columns([1, 2])
+                            cols[0].markdown(f"**{source_short_name}** pairs with:")
+
+                            pairing_options = ["(None)"] + all_channel_short_names
+
+                            paired_short_name = cols[1].selectbox(
+                                f"Select pair for {source_short_name}",
+                                options=pairing_options,
+                                key=f"global_pair_select_{source_short_name}",
+                                label_visibility="collapsed",
+                                on_change=utils.reset_values
+                            )
+                            if paired_short_name != "(None)":
+                                global_pairs[source_short_name] = paired_short_name
+
+                        # Apply global pairs to all files using full channel names
+                        for file_name, file_selections in selections.items():
+                            selected_channels = [ch for ch in file_selections.keys() if ch != 'pac_config']
+                            pairs[file_name] = {}
+
+                            for source_short, target_short in global_pairs.items():
+                                # Get the full channel names for this file
+                                source_full = short_name_to_full_names.get(source_short, {}).get(file_name)
+                                target_full = short_name_to_full_names.get(target_short, {}).get(file_name)
+
+                                # Only add the pair if both channels exist in this file
+                                if source_full and target_full and source_full in selected_channels and target_full in selected_channels:
+                                    pairs[file_name][source_full] = target_full
+            else:
+                # Per-file pairing: Original behavior
+                for file_name, file_selections in selections.items():
+                    selected_channels = [ch for ch in file_selections.keys() if ch != 'pac_config']
+
+                    if not selected_channels: continue
+
+                    with st.container(border=True):
+                        st.markdown(f"**Pairings for file: `{file_name}`**")
+                        pairs[file_name] = {}
+
+                        for source_channel in selected_channels:
+                            cols = st.columns([1, 2])
+                            cols[0].markdown(f"**{utils.extract_short_name(source_channel)}** pairs with:")
+
+                            pairing_options = ["(None)"] + selected_channels
+
+                            paired_channel = cols[1].selectbox(
+                                f"Select pair for {source_channel}",
+                                options=pairing_options,
+                                key=f"pair_select_{file_name}_{source_channel}",
+                                label_visibility="collapsed",
+                                format_func=utils.extract_short_name,
+                                on_change=utils.reset_values
+                            )
+                            if paired_channel != "(None)":
+                                pairs[file_name][source_channel] = paired_channel
 
         st.divider()
 
@@ -150,7 +213,6 @@ def PAC_settings(selections):
             c1, c2, c3 = st.columns(3)
             slide_state = c1.checkbox("Apply Sliding Window", value=False, on_change=utils.reset_values)
 
-
             sliding_window_duration_s = False
 
             if slide_state:
@@ -160,12 +222,6 @@ def PAC_settings(selections):
                 sliding_window_duration_s = False
                 overlap_sliding = False
             st.markdown("**Coheregram Settings**")
-
-            
-            
-
-
-            
 
         with col4:
             comudolo_state = st.checkbox("Calculate Comodulogram", value=False, on_change=utils.reset_values)
@@ -200,6 +256,7 @@ def PAC_settings(selections):
         "amp_freq_bands": amp_freq_bands,
         "use_cross_channel": use_cross_channel,
         "calculate_coherence": calculate_coherence,
+        "use_global_pairing": use_global_pairing,  # NEW: Add this flag
         "channel_pairs": pairs,
         "n_bins": n_bins,
         
@@ -221,83 +278,3 @@ def PAC_settings(selections):
         "amp_vec_dt": amp_vec_dt,
         "amp_vec_end": amp_vec_end,
     }
-    
-
-
-
-# def PAC_settings():
-#     with st.expander("⚙️ PAC Parameters", expanded=True):
-#         col3, col4 = st.columns(2)
-
-#         with col3:
-#             st.subheader("Phase-Amplitude Coupling (PAC) Settings")
-#             PAC_state = st.checkbox("Calculate PAC", value=True)
-
-#             c1,c2 = st.columns(2)
-#             n_bins = c2.number_input("Number of Bins for MI", min_value=2, value=18, help="Default is 18 bins.")
-#             phase_freq_band = c1.slider(
-#                 "Phase Providing Band (e.g., Theta) [Hz]", 
-#                 0.0, 50.0, (4.0, 10.0)
-#             )
-#             Amp_freq_band1 = c1.slider(
-#                 "Amplitude Providing Band 1 (e.g., Gamma) [Hz]", 
-#                 10.0, 150.0, (55.0, 80.0)
-#             )
-#             Amp_freq_band2 = c2.slider(
-#                 "Amplitude Providing Band 2 (e.g., Gamma) [Hz]", 
-#                 10.0, 150.0, (80.0, 100.0)
-#             )
-            
-            
-#             st.subheader("Sliding Window PAC")
-
-#             c1,c2,c3 = st.columns(3)
-#             slide_state = c1.checkbox("Apply Sliding Window PAC", value=False)
-#             sliding_window_duration_s = c2.number_input("Sliding Window Duration [s]", min_value=0.1, value=10.0)
-#             overlap_sliding = c3.slider("Sliding Window Overlap", 0.0, 1.0, 0.5, 0.05, format="%.2f")
-
-#         with col4:
-#             st.subheader("Comodulogram Settings")
-#             comudolo_state = st.checkbox("Calculate Comodulogram", value=False)
-            
-            
-#             st.markdown("**Phase Axis Vector (for plot)**")
-#             c1,c2,c3 = st.columns(3)
-#             phase_vec_start = c1.number_input("Phase Freq Start [Hz]", value=0)
-#             phase_vec_dt = c2.number_input("Phase Freq Step [Hz]", min_value=1, value=2)
-#             phase_vec_end = c3.number_input("Phase Freq End [Hz]", value=100)
-
-#             st.markdown("**Amplitude Axis Vector (for plot)**")
-
-#             c1,c2,c3 = st.columns(3)
-#             amp_vec_start = c1.number_input("Amplitude Freq Start [Hz]", value=0)
-#             amp_vec_dt = c2.number_input("Amplitude Freq Step [Hz]", min_value=1, value=2)
-#             amp_vec_end = c3.number_input("Amplitude Freq End [Hz]", value=100)
-            
-#             st.markdown("**Comodulogram Color Axis**")
-#             cax_cmd_vals = st.slider(
-#                 "Color axis range `[x, y]`", 
-#                 min_value=0.0, max_value=0.001, value=(0.0, 0.0005), 
-#                 step=0.00001, format="%.5f"
-#             )
-
-#     return {
-#         "PAC_state": PAC_state,
-#         "phase_freq_band": phase_freq_band,
-#         "Amp_freq_band1": Amp_freq_band1,
-#         "Amp_freq_band2": Amp_freq_band2,
-#         "n_bins": n_bins,
-#         "slide_state": slide_state,
-#         "sliding_window_duration_s": sliding_window_duration_s,
-#         "overlap_sliding": overlap_sliding,
-#         "comudolo_state": comudolo_state,
-#         "phase_vec_start": phase_vec_start,
-#         "phase_vec_dt": phase_vec_dt,
-#         "phase_vec_end": phase_vec_end,
-#         "amp_vec_start": amp_vec_start,
-#         "amp_vec_dt": amp_vec_dt,
-#         "amp_vec_end": amp_vec_end,
-#         "cax_cmd_vals": cax_cmd_vals
-#     }
-    
-

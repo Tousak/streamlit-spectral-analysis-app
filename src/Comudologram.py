@@ -55,6 +55,12 @@ def _calculate_and_plot_comodulogram(data_slice, fs, chann_name, time_range_str,
     estimator.fit(lfp)
     comodulogram = estimator.comod_
     
+    # Debug: Print shapes to understand the orientation
+    print(f"DEBUG - low_fq_range length: {len(low_fq_range)} (phase)")
+    print(f"DEBUG - high_fq_range length: {len(high_fq_range)} (amplitude)")
+    print(f"DEBUG - comodulogram.shape: {comodulogram.shape}")
+    print(f"DEBUG - comodulogram.T.shape: {comodulogram.T.shape}")
+    
     # --- 3. COLOR SCALING using absolute min/max ---
     if comodulogram.size > 0:
         vmin = np.nanmin(comodulogram)
@@ -69,11 +75,15 @@ def _calculate_and_plot_comodulogram(data_slice, fs, chann_name, time_range_str,
     
     levels = 40 # Number of contour levels for a smooth gradient
     
+    # CORRECT FIX: Don't transpose - pactools returns correct orientation
+    # comodulogram shape is (n_low_fq, n_high_fq) which matches contourf expectation
+    # when X=low_fq_range, Y=high_fq_range, Z should be (len(Y), len(X))
+    # So we DO need the transpose
     contour = ax.contourf(
         low_fq_range, 
         high_fq_range, 
-        comodulogram, 
-        levels=levels, 
+        comodulogram.T,  # Keep transpose - this should be correct
+        levels=levels,
         cmap='jet', 
         vmin=vmin, 
         vmax=vmax
