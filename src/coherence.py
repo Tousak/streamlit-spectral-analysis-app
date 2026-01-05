@@ -4,28 +4,20 @@ import numpy as np
 import plotly.graph_objects as go
 from scipy import signal
 from scipy.ndimage import uniform_filter1d # Import the filter
-# Import helper functions
+import matplotlib.pyplot as plt
 from src.utils import extract_short_name, notch_filter_50hz
 from src.PSD import calculate_band_power
-
-# ==============================================================================
-# 1. CORE CALCULATION AND PLOTTING ENGINES
-# ==============================================================================
 
 def _calculate_and_plot_coherence(signal1_slice, signal2_slice, fs, plot_title, F_h):
     f, Cxy = signal.coherence(signal1_slice, signal2_slice, fs=fs, nperseg=fs*2)
     fig = go.Figure(data=go.Scatter(x=f, y=Cxy, mode='lines'))
     fig.update_layout(title=plot_title, xaxis_title="Frequency (Hz)", yaxis_title="Coherence", yaxis_range=[0, 1], xaxis_range=[0, F_h])
     return fig, f, Cxy
-import streamlit as st
 
 def _calculate_and_plot_coheregram(signal1_slice, signal2_slice, fs, plot_title, F_h, time_res, freq_res):
     """
-    Calculates and plots a time-resolved coheregram (heatmap) with spectral smoothing.
-    Now with dynamic color range for better visualization.
+    Calculates and plots a time-resolved coheregram (heatmap) with spectral smoothing using Matplotlib.
     """
-
-    # --- Detrend signals to remove DC offset before analysis ---
     signal1_slice = signal.detrend(signal1_slice, type='constant')
     signal2_slice = signal.detrend(signal2_slice, type='constant')
 
@@ -34,66 +26,65 @@ def _calculate_and_plot_coheregram(signal1_slice, signal2_slice, fs, plot_title,
     if noverlap >= nperseg:
         noverlap = nperseg - 1
 
-    # --- 1. Get the time-resolved spectra using STFT with a Hann window ---
     f, t, Sxx = signal.stft(signal1_slice, fs=fs, nperseg=nperseg, noverlap=noverlap, window='hann')
     _, _, Syy = signal.stft(signal2_slice, fs=fs, nperseg=nperseg, noverlap=noverlap, window='hann')
 
-    # --- 2. Calculate Power and Cross-Power Spectral Density ---
     Pxx = np.abs(Sxx)**2
     Pyy = np.abs(Syy)**2
     Pxy = Sxx * np.conj(Syy)
 
-    # --- 3. Smooth the spectral estimates over the time axis ---
     smoothing_window_size = 5
-    
     Pxx_smoothed = uniform_filter1d(Pxx, size=smoothing_window_size, axis=1)
     Pyy_smoothed = uniform_filter1d(Pyy, size=smoothing_window_size, axis=1)
     Pxy_smoothed = uniform_filter1d(Pxy, size=smoothing_window_size, axis=1)
 
-    # --- 4. Calculate Coherence using the smoothed estimates ---
     epsilon = 1e-15
     coheregram = (np.abs(Pxy_smoothed)**2) / (Pxx_smoothed * Pyy_smoothed + epsilon)
-    
     coheregram_real = coheregram.astype(np.float64)
 
-    # --- 5. Dynamic Color Range Logic (NEW) ---
-    # Only consider frequencies up to F_h for determining color range
     freq_indices = np.where(f <= F_h)[0]
+    if freq_indices.size == 0:
+        # Handle case where no frequencies are within the desired range
+        fig, ax = plt.subplots(figsize=(10, 8))
+        ax.set_title(plot_title)
+        ax.set_xlabel("Time (s)")
+        ax.set_ylabel("Frequency (Hz)")
+        return fig, f, t, coheregram_real
+
     filtered_data = coheregram_real[freq_indices, :]
 
     if filtered_data.size > 0:
-        data_min = np.min(filtered_data)
-        data_max = np.max(filtered_data)
-        # Apply scaling: [0.9*min, 1.1*max] for better contrast
-        z_min = max(0, 0.9 * data_min)  # Don't go below 0
-        z_max = min(1, 1.1 * data_max)  # Don't go above 1 (coherence maximum)
+        vmin = np.nanmin(filtered_data)
+        vmax = np.nanmax(filtered_data)
+        if np.isclose(vmin, vmax):
+            vmax = vmin + 1e-9
     else:
-        z_min, z_max = 0, 1
-
-    # --- 6. Create the Smooth Contour Plot with dynamic color range ---
-    fig = go.Figure(data=go.Contour(
-        z=coheregram_real,
-        x=t + float(plot_title.split('(')[1].split('-')[0]),
-        y=f,
-        colorscale='Jet',
-        zmin=z_min,  # Dynamic minimum
-        zmax=z_max,  # Dynamic maximum
-        colorbar={'title': 'Coherence'},
-        contours_coloring='fill',
-        line_smoothing=0.85,
-        contours=dict(
-            start=z_min,
-            end=z_max,
-            size=(z_max - z_min) / 40  # More levels for smoother appearance
-        )
-    ))
-    fig.update_layout(
-        title=plot_title,
-        xaxis_title="Time (s)",
-        yaxis_title="Frequency (Hz)"
-    )
-    fig.update_yaxes(range=[0, F_h])
+        vmin, vmax = 0, 1
+        
+    fig, ax = plt.subplots(figsize=(10, 8))
     
+    levels = 40
+    
+    time_offset = float(plot_title.split('(')[1].split('-')[0])
+
+    contour = ax.contourf(
+        t + time_offset,
+        f[freq_indices], 
+        filtered_data,
+        levels=levels,
+        cmap='jet', 
+        vmin=vmin, 
+        vmax=vmax
+    )
+    
+    fig.colorbar(contour, ax=ax, label='Coherence')
+    ax.set_title(plot_title)
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Frequency (Hz)')
+    ax.set_ylim(0, F_h)
+    
+    fig.tight_layout()
+
     return fig, f, t, coheregram_real
 
 # --- NEW FUNCTION TO PLOT BAND COHERENCE ---
