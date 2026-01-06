@@ -305,6 +305,77 @@ def calculate_hierarchical_means(all_results):
         
     if 'coh_results' in all_results:
         _process_coh_results(all_results['coh_results'])
+        
+    if 'comod_results' in all_results:
+        _process_comod_results(all_results['comod_results'])
     
     return _clean_nans(all_results)
+
+def _process_comod_results(comod_data):
+    """
+    Calculates and adds hierarchical means and SEM for Comodulogram data (2D matrices).
+    """
+    all_file_means = []
+
+    for file_name, channels in comod_data.items():
+        if file_name in AGGREGATION_KEYS or not isinstance(channels, dict):
+            continue
+
+        all_channel_means = []
+        for channel_name, time_slices in channels.items():
+            if channel_name in AGGREGATION_KEYS or not isinstance(time_slices, dict):
+                continue
+            
+            # Gather all matrices for the current channel across its time slices
+            matrices_across_time = []
+            for time_slice, matrix in time_slices.items():
+                if time_slice in AGGREGATION_KEYS:
+                    continue
+                # Assuming matrix is a list of lists or np array
+                matrices_across_time.append(np.array(matrix))
+            
+            if matrices_across_time:
+                # Calculate mean across time
+                mean_across_time = np.mean(matrices_across_time, axis=0)
+                if len(matrices_across_time) > 1:
+                    sem_across_time = sem(matrices_across_time, axis=0, nan_policy='omit')
+                else:
+                    sem_across_time = np.zeros_like(mean_across_time)
+                
+                # Store back in the structure
+                # We store lists for JSON compatibility
+                channels[channel_name]['mean_across_time'] = {
+                    'mean': mean_across_time.tolist(), 
+                    'sem': sem_across_time.tolist()
+                }
+                
+                all_channel_means.append(mean_across_time)
+        
+        if all_channel_means:
+            # Calculate mean across channels for this file
+            mean_across_channels = np.mean(all_channel_means, axis=0)
+            if len(all_channel_means) > 1:
+                sem_across_channels = sem(all_channel_means, axis=0, nan_policy='omit')
+            else:
+                sem_across_channels = np.zeros_like(mean_across_channels)
+            
+            comod_data[file_name]['mean_across_channels'] = {
+                'mean': mean_across_channels.tolist(),
+                'sem': sem_across_channels.tolist()
+            }
+            
+            all_file_means.append(mean_across_channels)
+
+    if all_file_means:
+        # Calculate Grand Mean across files
+        grand_mean = np.mean(all_file_means, axis=0)
+        if len(all_file_means) > 1:
+            grand_sem = sem(all_file_means, axis=0, nan_policy='omit')
+        else:
+            grand_sem = np.zeros_like(grand_mean)
+        
+        comod_data['grand_mean'] = {
+            'mean': grand_mean.tolist(),
+            'sem': grand_sem.tolist()
+        }
 

@@ -197,12 +197,13 @@ if st.session_state.file_list and choosed:
                     load_mat_file_func=file_loader.load_mat_file
                 )
                 st.session_state.comod_figures = comod_figures
+                st.session_state.comod_results = comod_results
             
             st.success("Comodulogram analysis complete!")
 
 # --- Display logic for Comodulogram plots ---
 if 'comod_figures' in st.session_state and st.session_state.comod_figures:
-    COM_plotting.plot_COM(st.session_state.comod_figures)
+    COM_plotting.plot_COM(st.session_state.comod_results, st.session_state.comod_figures, pac_params)
 else:
     st.info("No Comudologram results to display")
 
