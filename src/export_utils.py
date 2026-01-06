@@ -10,6 +10,7 @@ import zipfile
 import plotly.graph_objects as go
 import concurrent.futures
 import numpy as np
+import warnings
 
 # A list of keys that are added during the hierarchical mean calculations.
 # These keys have a different data structure and should be skipped by the flattening functions.
@@ -96,6 +97,7 @@ def _flatten_pac_results(pac_data):
                 if band_info in AGGREGATION_KEYS or not isinstance(time_slices, dict): continue
                 for time_slice, values in time_slices.items():
                      if time_slice in AGGREGATION_KEYS: continue
+                     if time_slice.endswith('_sliding'): continue # Skip sliding window data
                      if isinstance(values, dict):
                         rows.append({
                             'File': file_name, 'Channel_or_Pair': name, 
@@ -289,7 +291,10 @@ def _convert_figure_to_bytes(fig_obj, image_format):
     elif isinstance(fig_obj, MatplotlibFigure):
         img_buffer = io.BytesIO()
         dpi = 150 if image_format == 'png' else 300 
-        fig_obj.savefig(img_buffer, format=image_format, bbox_inches='tight', dpi=dpi)
+        # Suppress Matplotlib warnings (e.g., about thread safety)
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            fig_obj.savefig(img_buffer, format=image_format, bbox_inches='tight', dpi=dpi)
         return img_buffer.getvalue()
     return None
 
@@ -321,6 +326,7 @@ def create_figures_zip_fast(cache_key, _figures_dict, image_format):
                     if image_bytes:
                         zip_file.writestr(filename, image_bytes)
                 except Exception as e:
-                    st.error(f"Failed to process '{filename}': {e}")
+                    # Log error to console instead of UI to avoid confusing the user
+                    print(f"Failed to process '{filename}': {e}")
 
     return zip_buffer.getvalue()

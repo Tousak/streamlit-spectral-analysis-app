@@ -53,7 +53,10 @@ def _process_pac_results(pac_data):
 
                 # --- 1. Calculate Mean Across Time Ranges ---
                 # Gather all scalar results for the current band across its time slices
-                metrics_across_time = [ts_data for ts, ts_data in time_slices.items() if ts not in AGGREGATION_KEYS]
+                metrics_across_time = [
+                    ts_data for ts, ts_data in time_slices.items() 
+                    if ts not in AGGREGATION_KEYS and not ts.endswith('_sliding')
+                ]
                 
                 if metrics_across_time:
                     # Convert list of dicts to dict of lists

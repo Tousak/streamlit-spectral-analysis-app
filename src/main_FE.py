@@ -159,8 +159,6 @@ def PAC_settings(selections):
             else:
                 sliding_window_duration_s = False
                 overlap_sliding = False
-            st.markdown("**Coheregram Settings**")
-
             
             
 

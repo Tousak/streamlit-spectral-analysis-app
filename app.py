@@ -177,7 +177,7 @@ if st.session_state.file_list and choosed:
 # --- Display logic for Coherence plots ---
 
 if 'coh_results' in st.session_state and st.session_state.coh_results:
-    COH_plotting.plot_COH(st.session_state.coh_figures)
+    COH_plotting.plot_COH(st.session_state.coh_results, st.session_state.coh_figures)
 else:
     st.info("No COH results to display")
 
