@@ -206,85 +206,85 @@ def run_pac_analysis(selections, pac_params, file_map, load_mat_file_func):
     fs_to_use = pac_params.get('fs', 2000) # Use fs from params, default to 2000
     F_h = pac_params.get('F_h', 200)
     # --- A. WITHIN-CHANNEL PAC ---
-    # if not pac_params['use_cross_channel']:
-    for file_name, file_selections in selections.items():
-        if file_name == 'pac_config': continue
-        
-        mat_contents = load_mat_file_func(file_map[file_name])
-        if not mat_contents: continue
-        
-        results[file_name], figures[file_name] = {}, {}
-        
-        for channel_name, time_ranges in file_selections.items():
-            if channel_name == 'pac_config' or not time_ranges: continue
+    if not pac_params['use_cross_channel']:
+        for file_name, file_selections in selections.items():
+            if file_name == 'pac_config': continue
             
-            # --- CHANGE HERE: Initialize as a dictionary ---
-            figures[file_name][channel_name] = {}
+            mat_contents = load_mat_file_func(file_map[file_name])
+            if not mat_contents: continue
             
-            signal_data_full = mat_contents[channel_name]['values'].flatten()
-            signal_data_full = utils.notch_filter_50hz(signal_data_full, fs_to_use, F_h)
-            results_per_slice = {}
+            results[file_name], figures[file_name] = {}, {}
             
-            for time_range in time_ranges:
-                slice_info = f"{time_range[0]}-{time_range[1]}s"
-                id_st = int(time_range[0] * fs_to_use)
-                id_end = int(time_range[1] * fs_to_use)
-                signal_slice = signal_data_full[id_st:id_end]
+            for channel_name, time_ranges in file_selections.items():
+                if channel_name == 'pac_config' or not time_ranges: continue
                 
-                for phase_band in pac_params['phase_freq_bands']:
-                    for amp_band in pac_params['amp_freq_bands']:
-                        band_info = f"Phase_{phase_band[0]}-{phase_band[1]}_Amp_{amp_band[0]}-{amp_band[1]}"
-                        
-                        b_phase, a_phase = signal.butter(4, phase_band, btype='bandpass', fs=fs_to_use)
-                        phase_filtered = signal.filtfilt(b_phase, a_phase, signal_slice)
-                        
-                        b_amp, a_amp = signal.butter(4, amp_band, btype='bandpass', fs=fs_to_use)
-                        amp_filtered = signal.filtfilt(b_amp, a_amp, signal_slice)
+                # --- CHANGE HERE: Initialize as a dictionary ---
+                figures[file_name][channel_name] = {}
+                
+                signal_data_full = mat_contents[channel_name]['values'].flatten()
+                signal_data_full = utils.notch_filter_50hz(signal_data_full, fs_to_use, F_h)
+                results_per_slice = {}
+                
+                for time_range in time_ranges:
+                    slice_info = f"{time_range[0]}-{time_range[1]}s"
+                    id_st = int(time_range[0] * fs_to_use)
+                    id_end = int(time_range[1] * fs_to_use)
+                    signal_slice = signal_data_full[id_st:id_end]
+                    
+                    for phase_band in pac_params['phase_freq_bands']:
+                        for amp_band in pac_params['amp_freq_bands']:
+                            band_info = f"Phase_{phase_band[0]}-{phase_band[1]}_Amp_{amp_band[0]}-{amp_band[1]}"
+                            
+                            b_phase, a_phase = signal.butter(4, phase_band, btype='bandpass', fs=fs_to_use)
+                            phase_filtered = signal.filtfilt(b_phase, a_phase, signal_slice)
+                            
+                            b_amp, a_amp = signal.butter(4, amp_band, btype='bandpass', fs=fs_to_use)
+                            amp_filtered = signal.filtfilt(b_amp, a_amp, signal_slice)
 
-                        scalar_results, plot_data = calculate_pac_metrics(phase_filtered, amp_filtered, fs_to_use, pac_params['n_bins'])
-                        
-                        results[file_name].setdefault(channel_name, {}).setdefault(band_info, {})[slice_info] = scalar_results
-                        results_per_slice[slice_info] = scalar_results
+                            scalar_results, plot_data = calculate_pac_metrics(phase_filtered, amp_filtered, fs_to_use, pac_params['n_bins'])
+                            
+                            results[file_name].setdefault(channel_name, {}).setdefault(band_info, {})[slice_info] = scalar_results
+                            results_per_slice[slice_info] = scalar_results
 
-                        # --- CHANGE HERE: Store in dictionary with a descriptive key ---
-                        # fig_key = f"Detail Plot | {slice_info} | {band_info}"
-                        fig_key = f"Detail Plot | {channel_name} | {slice_info} | {band_info}"
-                        detail_fig = create_pac_detail_plots_matplotlib(plot_data, channel_name, f"{slice_info} | {band_info}")
-                        figures[file_name][channel_name][fig_key] = detail_fig
-                        
-                        # --- SLIDING WINDOW PAC CALCULATION ---
-                        if pac_params['slide_state']:
-                            sliding_results = {'MI': [], 'MVL': [], 'PLV': []}
-                            
-                            phase_windows = generate_sliding_windows(phase_filtered, fs_to_use, pac_params['sliding_window_duration_s'], pac_params['overlap_sliding'])
-                            amp_windows = generate_sliding_windows(amp_filtered, fs_to_use, pac_params['sliding_window_duration_s'], pac_params['overlap_sliding'])
-                            
-                            for phase_win, amp_win in zip(phase_windows, amp_windows):
-                                s_res, _ = calculate_pac_metrics(phase_win, amp_win, fs_to_use, pac_params['n_bins'])
-                                sliding_results['MI'].append(s_res['MI'])
-                                sliding_results['MVL'].append(s_res['MVL'])
-                                sliding_results['PLV'].append(s_res['PLV'])
-                            
-                            results[file_name][channel_name][band_info][f"{slice_info}_sliding"] = sliding_results
-                            
                             # --- CHANGE HERE: Store in dictionary with a descriptive key ---
-                            sliding_fig_key = f"Sliding PAC | {slice_info} | {band_info}"
-                            sliding_fig = create_sliding_pac_plot(
-                                sliding_results, 
-                                channel_name, 
-                                time_range, # Pass the current time_range
-                                pac_params  # Pass the pac_params
-                            )
-                            if sliding_fig:
-                                figures[file_name][channel_name][sliding_fig_key] = sliding_fig
-            import streamlit as st
-            # Create the summary bar chart
-            if len(time_ranges) > 1:
-                summary_fig_key = f"Summary Chart | {channel_name}"
-                summary_fig = create_pac_summary_barchart_matplotlib(results_per_slice, channel_name)
-                if summary_fig:
-                    # st.write(f'f{file_name} | {channel_name} || {summary_fig_key}')
-                    figures[file_name][channel_name][summary_fig_key] = summary_fig
+                            # fig_key = f"Detail Plot | {slice_info} | {band_info}"
+                            fig_key = f"Detail Plot | {channel_name} | {slice_info} | {band_info}"
+                            detail_fig = create_pac_detail_plots_matplotlib(plot_data, channel_name, f"{slice_info} | {band_info}")
+                            figures[file_name][channel_name][fig_key] = detail_fig
+                            
+                            # --- SLIDING WINDOW PAC CALCULATION ---
+                            if pac_params['slide_state']:
+                                sliding_results = {'MI': [], 'MVL': [], 'PLV': []}
+                                
+                                phase_windows = generate_sliding_windows(phase_filtered, fs_to_use, pac_params['sliding_window_duration_s'], pac_params['overlap_sliding'])
+                                amp_windows = generate_sliding_windows(amp_filtered, fs_to_use, pac_params['sliding_window_duration_s'], pac_params['overlap_sliding'])
+                                
+                                for phase_win, amp_win in zip(phase_windows, amp_windows):
+                                    s_res, _ = calculate_pac_metrics(phase_win, amp_win, fs_to_use, pac_params['n_bins'])
+                                    sliding_results['MI'].append(s_res['MI'])
+                                    sliding_results['MVL'].append(s_res['MVL'])
+                                    sliding_results['PLV'].append(s_res['PLV'])
+                                
+                                results[file_name][channel_name][band_info][f"{slice_info}_sliding"] = sliding_results
+                                
+                                # --- CHANGE HERE: Store in dictionary with a descriptive key ---
+                                sliding_fig_key = f"Sliding PAC | {slice_info} | {band_info}"
+                                sliding_fig = create_sliding_pac_plot(
+                                    sliding_results, 
+                                    channel_name, 
+                                    time_range, # Pass the current time_range
+                                    pac_params  # Pass the pac_params
+                                )
+                                if sliding_fig:
+                                    figures[file_name][channel_name][sliding_fig_key] = sliding_fig
+                import streamlit as st
+                # Create the summary bar chart
+                if len(time_ranges) > 1:
+                    summary_fig_key = f"Summary Chart | {channel_name}"
+                    summary_fig = create_pac_summary_barchart_matplotlib(results_per_slice, channel_name)
+                    if summary_fig:
+                        # st.write(f'f{file_name} | {channel_name} || {summary_fig_key}')
+                        figures[file_name][channel_name][summary_fig_key] = summary_fig
     # --- B. BETWEEN-CHANNELS PAC (CORRECTED LOGIC) ---
     # else:
     if pac_params['use_cross_channel']:
@@ -294,7 +294,9 @@ def run_pac_analysis(selections, pac_params, file_map, load_mat_file_func):
             mat_contents = load_mat_file_func(file_map[file_name])
             if not mat_contents: continue
 
-            # results[file_name], figures[file_name] = {}, {}
+            # Ensure dictionaries are initialized if Loop A didn't run
+            if file_name not in results: results[file_name] = {}
+            if file_name not in figures: figures[file_name] = {}
 
             for phase_ch, amp_ch in pairs.items():
                 time_ranges = selections[file_name].get(phase_ch, [])
@@ -336,14 +338,44 @@ def run_pac_analysis(selections, pac_params, file_map, load_mat_file_func):
                             
                             slice_info = f"{time_range[0]}-{time_range[1]}s"
                             pair_name = f"Phase({utils.extract_short_name(phase_ch)})_Amp({utils.extract_short_name(amp_ch)})"
-                            band_info = f"Bands_{phase_band[0]}-{phase_band[1]}_{amp_band[0]}-{amp_band[1]}"
                             
-                            results[file_name].setdefault(pair_name, {}).setdefault(band_info, {})[slice_info] = scalar_results
+                            # Generic key for aggregation (so different pairs can be averaged)
+                            band_key = f"Bands_{phase_band[0]}-{phase_band[1]}_{amp_band[0]}-{amp_band[1]}"
+                            # Descriptive label for display (as requested by user)
+                            display_label = f"Phase({utils.extract_short_name(phase_ch)})_{phase_band[0]}-{phase_band[1]}_Amp({utils.extract_short_name(amp_ch)})_{amp_band[0]}-{amp_band[1]}"
+                            
+                            results[file_name].setdefault(pair_name, {}).setdefault(band_key, {})[slice_info] = scalar_results
                             results_per_slice[slice_info] = scalar_results
                             # --- CHANGE HERE: Store in dictionary with a descriptive key ---
-                            fig_key = f"Detail Plot | {file_name} | {pair_name} | {slice_info} | {band_info}"
-                            detail_fig = create_pac_detail_plots_matplotlib(plot_data, pair_name, f"{slice_info} | {band_info}")
+                            fig_key = f"Detail Plot | {file_name} | {pair_name} | {slice_info} | {display_label}"
+                            detail_fig = create_pac_detail_plots_matplotlib(plot_data, pair_name, f"{slice_info} | {display_label}")
                             figures[file_name].setdefault(pair_name, {})[fig_key] = detail_fig
+
+                            # --- SLIDING WINDOW PAC CALCULATION ---
+                            if pac_params['slide_state']:
+                                sliding_results = {'MI': [], 'MVL': [], 'PLV': []}
+                                
+                                phase_windows = generate_sliding_windows(phase_filtered, fs_to_use, pac_params['sliding_window_duration_s'], pac_params['overlap_sliding'])
+                                amp_windows = generate_sliding_windows(amp_filtered, fs_to_use, pac_params['sliding_window_duration_s'], pac_params['overlap_sliding'])
+                                
+                                for phase_win, amp_win in zip(phase_windows, amp_windows):
+                                    s_res, _ = calculate_pac_metrics(phase_win, amp_win, fs_to_use, pac_params['n_bins'])
+                                    sliding_results['MI'].append(s_res['MI'])
+                                    sliding_results['MVL'].append(s_res['MVL'])
+                                    sliding_results['PLV'].append(s_res['PLV'])
+                                
+                                results[file_name][pair_name][band_key][f"{slice_info}_sliding"] = sliding_results
+                                
+                                # --- CHANGE HERE: Store in dictionary with a descriptive key ---
+                                sliding_fig_key = f"Sliding PAC | {slice_info} | {display_label}"
+                                sliding_fig = create_sliding_pac_plot(
+                                    sliding_results, 
+                                    pair_name, 
+                                    time_range, # Pass the current time_range
+                                    pac_params  # Pass the pac_params
+                                )
+                                if sliding_fig:
+                                    figures[file_name][pair_name][sliding_fig_key] = sliding_fig
 
                 if len(time_ranges) > 1:
                     summary_fig_key = f"Summary Chart | {pair_name}"

@@ -80,7 +80,6 @@ def plot_PAC(pac_results, pac_figures):
                     with st.container(border=True):
                         st.pyplot(fig_to_display)
                         plt.close(fig_to_display)
-
     # --- Common data extraction for mean tabs ---
     # Get a list of all unique band combinations that have mean data
     all_bands = sorted(list(set(

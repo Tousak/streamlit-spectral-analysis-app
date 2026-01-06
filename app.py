@@ -148,7 +148,6 @@ if st.session_state.file_list and choosed:
 
 
         st.success("PAC Analysis Complete!")
-
 if st.session_state.get('pac_results') and st.session_state.get('pac_figures'):    
     PAC_plotting.plot_PAC(st.session_state.pac_results, st.session_state.pac_figures)
 else:
