@@ -128,8 +128,9 @@ def run_coherence_analysis(selections, params, pac_params, file_map, load_mat_fi
             signal2_full = mat_contents[amp_ch]['values'].flatten()
             fs_to_use = params.get('fs', 2000)
             
-            signal1_full = notch_filter_50hz(signal1_full, fs_to_use, F_h)
-            signal2_full = notch_filter_50hz(signal2_full, fs_to_use, F_h)
+            if pac_params.get('filter_50hz', True):
+                signal1_full = notch_filter_50hz(signal1_full, fs_to_use, F_h)
+                signal2_full = notch_filter_50hz(signal2_full, fs_to_use, F_h)
             
             pair_name_short = f"{extract_short_name(phase_ch)} vs {extract_short_name(amp_ch)}"
             

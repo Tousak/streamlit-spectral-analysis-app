@@ -95,6 +95,7 @@ if st.session_state.file_list and choosed:
         pac_params = main_FE.PAC_settings(st.session_state.selections)
         pac_params['fs'] = params['fs']
         pac_params['F_h'] = params['F_h']
+        pac_params['filter_50hz'] = params['filter_50hz']
  
 
     

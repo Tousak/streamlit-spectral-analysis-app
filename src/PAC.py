@@ -222,7 +222,10 @@ def run_pac_analysis(selections, pac_params, file_map, load_mat_file_func):
                 figures[file_name][channel_name] = {}
                 
                 signal_data_full = mat_contents[channel_name]['values'].flatten()
-                signal_data_full = utils.notch_filter_50hz(signal_data_full, fs_to_use, F_h)
+                
+                if pac_params.get('filter_50hz', True):
+                    signal_data_full = utils.notch_filter_50hz(signal_data_full, fs_to_use, F_h)
+                
                 results_per_slice = {}
                 
                 for time_range in time_ranges:
@@ -317,6 +320,10 @@ def run_pac_analysis(selections, pac_params, file_map, load_mat_file_func):
                 else:
                     fs_to_use = pac_params.get('fs', 2000)
                 # --- END OF ADDED BLOCK ---
+                
+                if pac_params.get('filter_50hz', True):
+                    phase_data_full = utils.notch_filter_50hz(phase_data_full, fs_to_use, F_h)
+                    amp_data_full = utils.notch_filter_50hz(amp_data_full, fs_to_use, F_h)
                 
                 results_per_slice = {}
                 for time_range in time_ranges:

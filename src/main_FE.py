@@ -13,6 +13,8 @@ def PSD_settings():
             st.subheader("General Settings")
             
             norm_type = st.checkbox("Normalize Power Spectrum", value=False, on_change=utils.reset_values)
+            filter_50hz = st.checkbox("Apply 50Hz Notch Filter", value=True, on_change=utils.reset_values)
+
             c1, c2, c3 = st.columns(3)
             fs = c1.number_input("Sampling Frequency [Hz]", min_value=1, value=2000, on_change=utils.reset_values)
             F_h = c2.number_input("Max Frequency of Interest [Hz]", min_value=1, value=100, on_change=utils.reset_values)
@@ -57,7 +59,8 @@ def PSD_settings():
         "desired_time_res": desired_time_res,
         "spec_F_range": spec_F_range,
         "k_cax": k_cax,
-        "SEM_state": SEM_state
+        "SEM_state": SEM_state,
+        "filter_50hz": filter_50hz
     }
 
 # This function now needs the selections dictionary to know which channels are available

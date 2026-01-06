@@ -51,10 +51,15 @@ def calculate_band_power(psd, freqs, bands):
 # ==============================================================================
 # 2. CORE CALCULATION ENGINE (Your original function)
 # ==============================================================================
-def psd_calc_python(data, norm_type, F_c, T1, F_h, spec_win_size, spec_noverlap, spec_F_range, k_cax, chann_name, fs, welch_params, spec_stat):
+def psd_calc_python(data, norm_type, F_c, T1, F_h, spec_win_size, spec_noverlap, spec_F_range, k_cax, chann_name, fs, welch_params, spec_stat, filter_50hz=True):
     chann_name = utils.remove_invalid_chars(chann_name)
     signal_raw, times_raw = data['values'], data['times']
-    signal_notched = utils.notch_filter_50hz(signal_raw, fs, F_h)
+    
+    if filter_50hz:
+        signal_notched = utils.notch_filter_50hz(signal_raw, fs, F_h)
+    else:
+        signal_notched = signal_raw
+        
     signal_normalized = (signal_notched - np.mean(signal_notched)) / np.std(signal_notched) if norm_type else signal_notched
     
     spec_win = signal.windows.hamming(spec_win_size)
